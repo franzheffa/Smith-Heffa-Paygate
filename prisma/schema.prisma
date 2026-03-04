@@ -7,13 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  uidentyId     String?       @unique // Lien Uidenty
+  balance       Float         @default(0.0) // Balance Ui Currency
+  transactions  Transaction[]
+  messages      Message[]
+  createdAt     DateTime      @default(now())
+}
+
 model Transaction {
   id              String   @id @default(cuid())
   amount          Float
   currency        String   @default("Ui")
   status          String   // PENDING, SUCCESS, FAILED
-  type            String   // STRIPE, MOBILE_MONEY, FIX
+  type            String   // STRIPE, MOMO, CONVERSION
+  traceabilityId  String   @unique
   userId          String
+  user            User     @relation(fields: [userId], references: [id])
   createdAt       DateTime @default(now())
-  traceabilityId  String   @unique // Identifiant unique pour audit
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  text      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
