@@ -1,73 +1,77 @@
-import React, { useState } from 'react';
-import { Smartphone, Globe, Shield, Zap, ArrowUpRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Smartphone, Shield, Zap, ArrowUpRight, Mic, Camera, Search, LayoutGrid } from 'lucide-react';
 
-export default function MobileFirstDashboard() {
+export default function MobileAIDashboard() {
   const gold = "#D4AF37";
-  const [loading, setLoading] = useState(false);
-
-  const handlePayment = async (type) => {
-    setLoading(true);
-    // Logique d'appel API vers Stripe ou Mobile Money
-    setTimeout(() => setLoading(false), 2000);
-  };
+  const [usdAmount] = useState(150.00); // Exemple
+  const rate = 600; // Taux Hiflux dynamique
+  const fcfaAmount = usdAmount * rate;
 
   return (
-    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
-      {/* Header Statut AI */}
-      <header style={{ padding: '20px', borderBottom: '1px solid #F2F2F2', textAlign: 'center' }}>
-        <div style={{ fontSize: '12px', color: gold, fontWeight: 'bold', letterSpacing: '2px' }}>AI ORCHESTRATOR ACTIVE</div>
-        <h1 style={{ fontSize: '20px', margin: '5px 0', fontWeight: '900' }}>BUTTERTECH UI</h1>
-      </header>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
+      
+      {/* AI Navigation Bar - Multimodal Gemini */}
+      <nav style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F8F8F8' }}>
+        <LayoutGrid size={24} color="#000" />
+        <div style={{ fontWeight: '900', letterSpacing: '2px' }}>BUTTERTECH</div>
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <Camera size={24} color={gold} />
+          <Mic size={24} color={gold} />
+        </div>
+      </nav>
 
-      {/* Main Wallet Card - Style Material Design */}
       <main style={{ flex: 1, padding: '20px' }}>
-        <div style={{ background: '#000', borderRadius: '24px', padding: '30px', color: '#FFF', marginBottom: '30px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
-          <p style={{ color: gold, fontSize: '14px', marginBottom: '10px' }}>Digital Balance</p>
-          <h2 style={{ fontSize: '36px', margin: 0 }}>1,250.00 <span style={{ color: gold, fontSize: '18px' }}>Ui</span></h2>
-          <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-            <div style={{ background: 'rgba(212,175,55,0.2)', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', color: gold }}>Secure FIX 4.4 Bridge</div>
+        {/* Main Wallet Card - The "Gold" Standard */}
+        <div style={{ 
+          background: '#000', 
+          borderRadius: '28px', 
+          padding: '35px 25px', 
+          color: '#FFF', 
+          marginBottom: '30px', 
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <p style={{ color: gold, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px' }}>Global Balance</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+            <h2 style={{ fontSize: '38px', margin: 0 }}>${usdAmount.toLocaleString()}</h2>
+            <span style={{ color: gold, fontSize: '18px', fontWeight: '300' }}>/ {fcfaAmount.toLocaleString()} FCFA</span>
+          </div>
+          <div style={{ marginTop: '25px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '50%' }}></div>
+            <span style={{ fontSize: '12px', color: '#888' }}>Gemini Multimodal AI Secured</span>
           </div>
         </div>
 
-        {/* Quick Actions - Mobile First */}
-        <section>
-          <h3 style={{ fontSize: '14px', color: '#999', marginBottom: '15px', textTransform: 'uppercase' }}>Services Intemporels</h3>
-          
-          {/* Apple Pay / Stripe */}
-          <button 
-            onClick={() => handlePayment('stripe')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', background: '#FAFAFA', border: '1px solid #EEE', borderRadius: '16px', marginBottom: '15px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <Zap color={gold} fill={gold} />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 'bold' }}>Stripe & Apple Pay</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>Europe, USA, Canada</div>
-              </div>
-            </div>
-            <ArrowUpRight size={18} color={gold} />
-          </button>
+        {/* AI Prompt Input (Central Feature for Mobile AI First) */}
+        <div style={{ marginBottom: '30px', position: 'relative' }}>
+          <input 
+            type="text" 
+            placeholder="Dis à l'IA : Envoie 50$ à Jean en Mobile Money..."
+            style={{ width: '100%', padding: '18px 50px 18px 20px', borderRadius: '15px', border: '1px solid #EEE', backgroundColor: '#FAFAFA', fontSize: '14px' }}
+          />
+          <Search size={20} color={gold} style={{ position: 'absolute', right: '15px', top: '18px' }} />
+        </div>
 
-          {/* Mobile Money */}
-          <button 
-            onClick={() => handlePayment('momo')}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', background: '#FAFAFA', border: '1px solid #EEE', borderRadius: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <Smartphone color="#000" />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 'bold' }}>Mobile Money Africa</div>
-                <div style={{ fontSize: '12px', color: '#666' }}>MTN, Orange, M-Pesa</div>
-              </div>
-            </div>
-            <ArrowUpRight size={18} color={gold} />
+        {/* Action Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <button style={{ padding: '20px', background: '#FFF', border: '1px solid #EEE', borderRadius: '20px', textAlign: 'left' }}>
+            <Zap size={24} color={gold} style={{ marginBottom: '10px' }} />
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>Stripe</div>
+            <div style={{ fontSize: '11px', color: '#999' }}>Apple Pay & Cards</div>
           </button>
-        </section>
+          <button style={{ padding: '20px', background: '#FFF', border: '1px solid #EEE', borderRadius: '20px', textAlign: 'left' }}>
+            <Smartphone size={24} color={gold} style={{ marginBottom: '10px' }} />
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>MoMo</div>
+            <div style={{ fontSize: '11px', color: '#999' }}>Africa Payout</div>
+          </button>
+        </div>
       </main>
 
-      {/* Navigation Footer */}
-      <footer style={{ padding: '20px', borderTop: '1px solid #F2F2F2', display: 'flex', justifyContent: 'space-around', backgroundColor: '#FFF' }}>
-        <Shield color={gold} />
-        <Globe color="#DDD" />
-        <div style={{ width: '24px', height: '24px', background: '#000', borderRadius: '50%' }}></div>
+      {/* Footer System Nav */}
+      <footer style={{ padding: '20px', display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #F8F8F8' }}>
+        <Shield size={24} color="#000" />
+        <div style={{ width: '50px', height: '5px', background: '#EEE', borderRadius: '10px' }}></div>
+        <div style={{ fontSize: '12px', fontWeight: 'bold', color: gold }}>HIFLUX v1.0</div>
       </footer>
     </div>
   );
