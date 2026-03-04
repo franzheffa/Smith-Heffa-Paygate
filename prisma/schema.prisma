@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  amount          Float
+  currency        String   @default("Ui")
+  status          String   // PENDING, SUCCESS, FAILED
+  type            String   // STRIPE, MOBILE_MONEY, FIX
+  userId          String
+  createdAt       DateTime @default(now())
+  traceabilityId  String   @unique // Identifiant unique pour audit
+}
