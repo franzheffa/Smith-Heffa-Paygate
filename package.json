@@ -1,6 +1,6 @@
 {
-  "name": "finance-fixapi-mvp",
-  "version": "1.0.0",
+  "name": "finance-fixapi-next-gold",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
