@@ -28,6 +28,10 @@ INTERAC_API_BASE_URL=https://api.interac.example
 INTERAC_API_KEY=replace_me
 ORANGE_ORDERING_BASE_URL=https://api.orange.com/ordering/b2b/v3
 ORANGE_OAUTH_TOKEN_URL=https://api.orange.com/oauth/v3/token
+ORANGE_OIDC_TOKEN_URL=https://api.orange.com/oauth/v3/token
+ORANGE_OIDC_AUTHORIZE_URL=https://api.orange.com/oauth/v3/authorize
+ORANGE_OIDC_REDIRECT_URI=https://smith-heffa-paygate.vercel.app/api/oidc/callback
+ORANGE_OIDC_SCOPE=openid dpv:FraudPreventionAndDetection number-verification:verify
 ORANGE_ORDERING_SCOPE=b2b:ordering
 ORANGE_ACCEPT_LANGUAGE=fr
 ORANGE_CLIENT_ID=replace_me
@@ -71,6 +75,17 @@ vercel env add SEPA_API_KEY production
 vercel env add SEPA_PAYOUT_PATH production
 vercel env add INTERAC_API_BASE_URL production
 vercel env add INTERAC_API_KEY production
+vercel env add ORANGE_ORDERING_BASE_URL production
+vercel env add ORANGE_OAUTH_TOKEN_URL production
+vercel env add ORANGE_OIDC_TOKEN_URL production
+vercel env add ORANGE_OIDC_AUTHORIZE_URL production
+vercel env add ORANGE_OIDC_REDIRECT_URI production
+vercel env add ORANGE_OIDC_SCOPE production
+vercel env add ORANGE_ORDERING_SCOPE production
+vercel env add ORANGE_ACCEPT_LANGUAGE production
+vercel env add ORANGE_CLIENT_ID production
+vercel env add ORANGE_CLIENT_SECRET production
+vercel env add ORANGE_API_KEY production
 vercel --prod --yes
 ```
 
@@ -165,4 +180,29 @@ curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mpesa-payout.json
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/swift-payout.json
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/sepa-payout.json
+```
+
+## 9) Flux OIDC Frontend + PKCE (visible)
+
+Page de validation:
+
+- `GET /oidc-debug`
+
+Endpoints:
+
+- `POST /api/oidc/init` (génère state + code_verifier + code_challenge + authorize URL)
+- `GET /api/oidc/callback` (échange le code authorization contre access token)
+
+Test `cat` prêt:
+
+```bash
+cat > /tmp/oidc-init.json <<'EOF'
+{
+  "scope": "openid dpv:FraudPreventionAndDetection number-verification:verify"
+}
+EOF
+
+curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/init" \
+  -H "Content-Type: application/json" \
+  --data-binary @/tmp/oidc-init.json
 ```
