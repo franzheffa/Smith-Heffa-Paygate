@@ -33,6 +33,7 @@ ORANGE_OIDC_AUTHORIZE_URL=https://api.orange.com/oauth/v3/authorize
 ORANGE_OIDC_REDIRECT_URI=https://smith-heffa-paygate.vercel.app/api/oidc/callback
 ORANGE_OIDC_SCOPE=openid dpv:FraudPreventionAndDetection number-verification:verify
 ORANGE_OIDC_CIBA_AUTHORIZE_URL=https://api.orange.com/oauth/v3/bc-authorize
+ORANGE_OIDC_CIBA_TOKEN_URL=https://api.orange.com/oauth/v3/token
 ORANGE_OIDC_CIBA_AUTH_METHOD=basic
 ORANGE_OIDC_CIBA_SCOPE=openid dpv:FraudPreventionAndDetection sim-swap:check
 ORANGE_ORDERING_SCOPE=b2b:ordering
@@ -89,6 +90,7 @@ vercel env add ORANGE_OIDC_AUTHORIZE_URL production
 vercel env add ORANGE_OIDC_REDIRECT_URI production
 vercel env add ORANGE_OIDC_SCOPE production
 vercel env add ORANGE_OIDC_CIBA_AUTHORIZE_URL production
+vercel env add ORANGE_OIDC_CIBA_TOKEN_URL production
 vercel env add ORANGE_OIDC_CIBA_AUTH_METHOD production
 vercel env add ORANGE_OIDC_CIBA_SCOPE production
 vercel env add ORANGE_ORDERING_SCOPE production
@@ -253,7 +255,8 @@ cat > /tmp/ciba-token.json <<'EOF'
 {
   "action": "token",
   "authMethod": "basic",
-  "auth_req_id": "REPLACE_AUTH_REQ_ID"
+  "auth_req_id": "REPLACE_AUTH_REQ_ID",
+  "token_url": "https://api.orange.com/openidconnect/ciba/fr/v1/token"
 }
 EOF
 
@@ -262,6 +265,7 @@ cat > /tmp/ciba-poll.json <<'EOF'
   "action": "poll",
   "authMethod": "basic",
   "auth_req_id": "REPLACE_AUTH_REQ_ID",
+  "token_url": "https://api.orange.com/openidconnect/ciba/fr/v1/token",
   "maxAttempts": 6,
   "intervalSec": 2
 }

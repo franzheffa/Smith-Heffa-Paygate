@@ -17,6 +17,29 @@ function getBcAuthorizeUrl() {
   return getTokenUrl().replace(/\/token$/, '/bc-authorize');
 }
 
+function uniq(values) {
+  return [...new Set(values.filter(Boolean).map((v) => String(v).trim()))];
+}
+
+function authorizeCandidates() {
+  return uniq([
+    process.env.ORANGE_OIDC_CIBA_AUTHORIZE_URL,
+    getBcAuthorizeUrl(),
+    'https://api.orange.com/openidconnect/ciba/fr/v1/bc-authorize',
+    'https://api.orange.com/es/openapi/oauth/v2/bc-authorize'
+  ]);
+}
+
+function tokenCandidates(extra = []) {
+  return uniq([
+    ...extra,
+    process.env.ORANGE_OIDC_CIBA_TOKEN_URL,
+    getTokenUrl(),
+    'https://api.orange.com/openidconnect/ciba/fr/v1/token',
+    'https://api.orange.com/es/openapi/oauth/v2/token'
+  ]);
+}
+
 function normalizePem(value) {
   return String(value || '').replace(/\\n/g, '\n').trim();
 }
@@ -90,17 +113,46 @@ async function postForm(url, form, authMethod = 'basic') {
 }
 
 async function startCiba({ loginHint, scope, authMethod }) {
-  const form = new URLSearchParams();
-  form.set('login_hint', loginHint);
-  form.set('scope', scope);
-  return postForm(getBcAuthorizeUrl(), form, authMethod);
+  let last = null;
+  for (const endpoint of authorizeCandidates()) {
+    const form = new URLSearchParams();
+    form.set('login_hint', loginHint);
+    form.set('scope', scope);
+    const result = await postForm(endpoint, form, authMethod);
+    const err = String(result.data?.error || '').toLowerCase();
+    const errDesc = String(result.data?.error_description || '').toLowerCase();
+
+    if (
+      authMethod === 'basic' &&
+      (err === 'invalid_request' && errDesc.includes('client_assertion_type'))
+    ) {
+      last = { ...result, endpoint };
+      continue;
+    }
+
+    if (result.ok || !['resource_not_found', 'method_not_allowed'].includes(err)) {
+      return { ...result, endpoint };
+    }
+    last = { ...result, endpoint };
+  }
+  return last || { status: 500, ok: false, data: { error: 'ciba_endpoint_not_found' } };
 }
 
-async function getCibaToken({ authReqId, authMethod }) {
-  const form = new URLSearchParams();
-  form.set('grant_type', CIBA_GRANT_TYPE);
-  form.set('auth_req_id', authReqId);
-  return postForm(getTokenUrl(), form, authMethod);
+async function getCibaToken({ authReqId, authMethod, preferredTokenUrl }) {
+  let last = null;
+  for (const endpoint of tokenCandidates([preferredTokenUrl])) {
+    const form = new URLSearchParams();
+    form.set('grant_type', CIBA_GRANT_TYPE);
+    form.set('auth_req_id', authReqId);
+    const result = await postForm(endpoint, form, authMethod);
+    const err = String(result.data?.error || '').toLowerCase();
+
+    if (result.ok || !['resource_not_found', 'method_not_allowed'].includes(err)) {
+      return { ...result, endpoint };
+    }
+    last = { ...result, endpoint };
+  }
+  return last || { status: 500, ok: false, data: { error: 'token_endpoint_not_found' } };
 }
 
 export default async function handler(req, res) {
@@ -128,20 +180,22 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing login_hint (e.g. tel:+33712345678)' });
       }
       const result = await startCiba({ loginHint, scope, authMethod });
-      return res.status(result.status).json(result.data);
+      return res.status(result.status).json({ ...result.data, ciba_endpoint: result.endpoint, auth_method: authMethod });
     }
 
     if (action === 'token') {
       const authReqId = String(req.body?.auth_req_id || req.body?.authReqId || '').trim();
+      const preferredTokenUrl = String(req.body?.token_url || req.body?.tokenUrl || '').trim();
       if (!authReqId) {
         return res.status(400).json({ error: 'Missing auth_req_id' });
       }
-      const result = await getCibaToken({ authReqId, authMethod });
-      return res.status(result.status).json(result.data);
+      const result = await getCibaToken({ authReqId, authMethod, preferredTokenUrl });
+      return res.status(result.status).json({ ...result.data, token_endpoint: result.endpoint, auth_method: authMethod });
     }
 
     if (action === 'poll') {
       const authReqId = String(req.body?.auth_req_id || req.body?.authReqId || '').trim();
+      const preferredTokenUrl = String(req.body?.token_url || req.body?.tokenUrl || '').trim();
       if (!authReqId) {
         return res.status(400).json({ error: 'Missing auth_req_id' });
       }
@@ -151,16 +205,16 @@ export default async function handler(req, res) {
       let last = null;
 
       for (let i = 0; i < maxAttempts; i += 1) {
-        last = await getCibaToken({ authReqId, authMethod });
+        last = await getCibaToken({ authReqId, authMethod, preferredTokenUrl });
 
         const errorCode = String(last.data?.error || '');
         if (last.ok) {
-          return res.status(200).json({ ...last.data, poll_attempts: i + 1 });
+          return res.status(200).json({ ...last.data, poll_attempts: i + 1, token_endpoint: last.endpoint, auth_method: authMethod });
         }
 
         if (errorCode === 'slow_down') intervalSec += 1;
         if (!['authorization_pending', 'slow_down'].includes(errorCode)) {
-          return res.status(last.status).json({ ...last.data, poll_attempts: i + 1 });
+          return res.status(last.status).json({ ...last.data, poll_attempts: i + 1, token_endpoint: last.endpoint, auth_method: authMethod });
         }
 
         await new Promise((resolve) => setTimeout(resolve, intervalSec * 1000));
@@ -169,6 +223,8 @@ export default async function handler(req, res) {
       return res.status(last?.status || 408).json({
         ...(last?.data || { error: 'authorization_pending' }),
         poll_attempts: maxAttempts,
+        token_endpoint: last?.endpoint,
+        auth_method: authMethod,
         message: 'Polling timed out before token availability'
       });
     }
