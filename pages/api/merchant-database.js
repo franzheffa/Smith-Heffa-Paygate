@@ -5,11 +5,22 @@ export default async function handler(req, res) {
     { id: 'camtel', name: 'BLUE MONEY', color: '#0055A4', brand: 'Camtel' }
   ];
 
+  if (req.method === 'GET') {
+    return res.status(200).json(merchants);
+  }
+
   if (req.method === 'POST') {
-    const { detectedColor } = req.body;
+    const detectedColor = String(req.body?.detectedColor || '').toUpperCase();
+
+    if (!detectedColor) {
+      return res.status(400).json({ error: 'detectedColor is required' });
+    }
+
     // Simulation de matching de logo par couleur
     const match = merchants.find(m => m.color === detectedColor) || merchants[0];
     return res.status(200).json({ success: true, merchant: match });
   }
-  res.status(200).json(merchants);
+
+  res.setHeader('Allow', 'GET, POST');
+  return res.status(405).json({ error: 'Method Not Allowed' });
 }

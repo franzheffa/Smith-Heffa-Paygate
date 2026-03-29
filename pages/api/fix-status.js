@@ -1,5 +1,10 @@
 export default function handler(req, res) {
-  res.status(200).json({ 
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  return res.status(200).json({
     status: "Connected", 
     protocol: "FIX 4.4",
     message: "Simulation active - GCP Billing Bypass Mode",

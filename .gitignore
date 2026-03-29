@@ -244,3 +244,6 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 .vercel
+.env
+.env.*
+!.env.example
