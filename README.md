@@ -188,7 +188,7 @@ cat > /tmp/applepay-intent.json <<'EOF'
 EOF
 
 cat > /tmp/mtn-payout.json <<'EOF'
-{"provider":"mtn","amount":1000,"currency":"XAF","phone":"+237690000000","country":"CM","reference":"MTN-001","dryRun":true}
+{"provider":"mtn","operation":"disbursement","amount":1000,"currency":"XAF","phone":"237690000000","country":"CM","reference":"f1268de0-b76f-4f36-b637-f3ef02ba7f31","dryRun":true}
 EOF
 
 cat > /tmp/mpesa-payout.json <<'EOF'
@@ -209,6 +209,26 @@ curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mpesa-payout.json
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/swift-payout.json
 curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/sepa-payout.json
+```
+
+MTN MoMo (route dédiée officielle) :
+
+```bash
+cat > /tmp/mtn-preflight.json <<'EOF'
+{"action":"preflight"}
+EOF
+
+cat > /tmp/mtn-requesttopay.json <<'EOF'
+{"action":"requestToPay","amount":"1000","currency":"XAF","msisdn":"237690000000","externalId":"COL-001","payerMessage":"Paiement","payeeNote":"Paiement","referenceId":"f1268de0-b76f-4f36-b637-f3ef02ba7f31"}
+EOF
+
+cat > /tmp/mtn-transfer.json <<'EOF'
+{"action":"transfer","amount":"1000","currency":"XAF","msisdn":"237690000000","externalId":"DISB-001","payerMessage":"Payout","payeeNote":"Payout","referenceId":"1af0bc90-3906-4f72-bebc-34f87e47a3d6"}
+EOF
+
+curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-preflight.json
+curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-requesttopay.json
+curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-transfer.json
 ```
 
 ## 9) Flux OIDC Frontend + PKCE (visible)
