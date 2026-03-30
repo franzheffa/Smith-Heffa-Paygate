@@ -15,6 +15,7 @@ model User {
   balance       Float         @default(0.0) // Balance Ui Currency
   transactions  Transaction[]
   messages      Message[]
+  authAccount   AuthAccount?
   createdAt     DateTime      @default(now())
 }
 
@@ -36,4 +37,32 @@ model Message {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model AuthAccount {
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email            String        @unique
+  passwordHash     String
+  twoFactorEnabled Boolean       @default(false)
+  twoFactorSecret  String?
+  sessions         AuthSession[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model AuthSession {
+  id         String      @id @default(cuid())
+  accountId  String
+  account    AuthAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokenHash  String      @unique
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([accountId])
+  @@index([expiresAt])
 }

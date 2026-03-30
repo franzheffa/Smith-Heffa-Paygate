@@ -35,7 +35,7 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const authEnabled = boolEnv('AUTH_ENABLED', false);
+  const authEnabled = boolEnv('AUTH_ENABLED', hasEnv('DATABASE_URL'));
   const twoFactorEnabled = boolEnv('AUTH_2FA_ENABLED', false);
   const biometricEnabled = boolEnv('AUTH_BIOMETRIC_ENABLED', false);
 
@@ -48,9 +48,9 @@ export default function handler(req, res) {
 
   const security = {
     auth: authEnabled ? 'enabled' : 'pending',
-    two_factor: twoFactorEnabled ? 'enabled' : 'planned',
+    two_factor: twoFactorEnabled ? 'enabled' : (authEnabled ? 'available' : 'planned'),
     biometric_unlock: biometricEnabled ? 'enabled' : 'planned',
-    session_hardening: boolEnv('SESSION_HARDENING_ENABLED', false) ? 'enabled' : 'planned'
+    session_hardening: boolEnv('SESSION_HARDENING_ENABLED', hasEnv('AUTH_SESSION_TTL_SECONDS')) ? 'enabled' : 'planned'
   };
 
   return res.status(200).json({
