@@ -41,6 +41,7 @@ export default function EliteDashboard() {
   const [isListening, setIsListening] = useState(false);
   const videoRef = useRef(null);
   const [showPayModal, setShowPayModal] = useState(null);
+  const [stripeProc, setStripeProc] = useState(false);
   const [momoStep, setMomoStep]     = useState(0);
   const [momoOp, setMomoOp]         = useState(null);
   const [momoPhone, setMomoPhone]   = useState('');
@@ -133,6 +134,26 @@ export default function EliteDashboard() {
     setInteracRef(ref); setInteracProc(false); setInteracStep(5);
     addLog('Interac confirme - ' + ref); speak('Interac confirme');
   };
+  const execStripeCheckout = async () => {
+    if (stripeProc) return;
+    setStripeProc(true);
+    addLog('STRIPE / VISA execute');
+    try {
+      const res = await fetch('/api/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 5000 })
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || 'Stripe checkout session failed');
+      }
+      window.location.href = data.url;
+    } catch (e) {
+      addLog('STRIPE echec - ' + (e?.message || 'Erreur inconnue'));
+      setStripeProc(false);
+    }
+  };
   const momoUsd   = momoAmount   ? (parseInt(momoAmount) / 600).toFixed(2)         : '0.00';
   const swiftEur  = swiftAmount  ? (parseFloat(swiftAmount) * 0.92).toFixed(2)      : '0.00';
   const sepaUsd   = sepaAmount   ? (parseFloat(sepaAmount) * 1.09).toFixed(2)       : '0.00';
@@ -207,7 +228,15 @@ export default function EliteDashboard() {
       ),
       showPayModal && React.createElement(Sheet, { onClose:()=>setShowPayModal(null), title:'CONFIRMER ' + showPayModal },
         React.createElement('p', { style:{ fontSize:'12px', color:'#666', marginBottom:'30px' } }, 'Protocole FIX 4.4 & NVIDIA Inception Security actif.'),
-        React.createElement(ActBtn, { label:"EXECUTER L'ORDRE", onClick:()=>{ addLog(showPayModal + ' execute'); setShowPayModal(null); } }),
+        React.createElement(ActBtn, {
+          label: showPayModal === 'STRIPE / VISA' && stripeProc ? 'REDIRECTION STRIPE...' : "EXECUTER L'ORDRE",
+          disabled: showPayModal === 'STRIPE / VISA' ? stripeProc : false,
+          onClick:()=>{
+            if (showPayModal === 'STRIPE / VISA') return execStripeCheckout();
+            addLog(showPayModal + ' execute');
+            setShowPayModal(null);
+          }
+        }),
         React.createElement(BkBtn, { label:'Annuler', onClick:()=>setShowPayModal(null) })
       ),
       momoStep===1 && React.createElement(Sheet, { onClose:rMomo, title:"CHOISIR L'OPERATEUR" }, MOMO_OPERATORS.map(op => React.createElement(OpRow, { key:op.id, color:op.color, name:op.name, sub:op.country, onClick:()=>{ setMomoOp(op); setMomoStep(2); } }))),
