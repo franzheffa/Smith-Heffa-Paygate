@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && ( [ -n \"$DATABASE_URL\" ] && prisma migrate deploy || echo \"Skipping prisma migrate deploy: DATABASE_URL not set\" )"
   },
   "dependencies": {
     "next": "^14.2.35",
