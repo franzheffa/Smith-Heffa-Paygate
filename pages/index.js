@@ -8,6 +8,46 @@ const MOMO_OPERATORS = [
   { id: 'wave',   name: 'Wave',              country: 'SN CI ML BF', color: '#0066FF', prefix: '+221' },
   { id: 'moov',   name: 'Moov Money',        country: 'BJ TG CI NE', color: '#0033A0', prefix: '+229' },
 ];
+const MOMO_DIAL_CODES = {
+  mtn: [
+    { code: '+225', label: 'Cote d Ivoire (+225)' },
+    { code: '+233', label: 'Ghana (+233)' },
+    { code: '+237', label: 'Cameroun (+237)' },
+    { code: '+221', label: 'Senegal (+221)' },
+    { code: '+250', label: 'Rwanda (+250)' },
+    { code: '+256', label: 'Ouganda (+256)' },
+    { code: '+260', label: 'Zambie (+260)' }
+  ],
+  orange: [
+    { code: '+221', label: 'Senegal (+221)' },
+    { code: '+223', label: 'Mali (+223)' },
+    { code: '+225', label: 'Cote d Ivoire (+225)' },
+    { code: '+226', label: 'Burkina Faso (+226)' },
+    { code: '+224', label: 'Guinee (+224)' },
+    { code: '+242', label: 'Congo (+242)' },
+    { code: '+237', label: 'Cameroun (+237)' }
+  ],
+  mpesa: [
+    { code: '+254', label: 'Kenya (+254)' },
+    { code: '+255', label: 'Tanzanie (+255)' },
+    { code: '+250', label: 'Rwanda (+250)' },
+    { code: '+258', label: 'Mozambique (+258)' },
+    { code: '+251', label: 'Ethiopie (+251)' },
+    { code: '+256', label: 'Ouganda (+256)' }
+  ],
+  wave: [
+    { code: '+221', label: 'Senegal (+221)' },
+    { code: '+225', label: 'Cote d Ivoire (+225)' },
+    { code: '+223', label: 'Mali (+223)' },
+    { code: '+226', label: 'Burkina Faso (+226)' }
+  ],
+  moov: [
+    { code: '+229', label: 'Benin (+229)' },
+    { code: '+228', label: 'Togo (+228)' },
+    { code: '+225', label: 'Cote d Ivoire (+225)' },
+    { code: '+227', label: 'Niger (+227)' }
+  ]
+};
 const MOMO_AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 const FIAT_AMOUNTS = [100, 250, 500, 1000, 2500, 5000];
 const SWIFT_BANKS = [
@@ -44,6 +84,7 @@ export default function EliteDashboard() {
   const [payProc, setPayProc] = useState(null);
   const [momoStep, setMomoStep]     = useState(0);
   const [momoOp, setMomoOp]         = useState(null);
+  const [momoDial, setMomoDial]     = useState('');
   const [momoPhone, setMomoPhone]   = useState('');
   const [momoAmount, setMomoAmount] = useState('');
   const [momoPin, setMomoPin]       = useState('');
@@ -106,7 +147,7 @@ export default function EliteDashboard() {
     r.onresult = (e) => addLog('Commande: ' + e.results[0][0].transcript);
     r.start();
   };
-  const rMomo    = () => { setMomoStep(0);    setMomoOp(null);    setMomoPhone('');   setMomoAmount('');  setMomoPin('');  setMomoRef(''); };
+  const rMomo    = () => { setMomoStep(0);    setMomoOp(null);    setMomoDial('');    setMomoPhone('');   setMomoAmount('');  setMomoPin('');  setMomoRef(''); };
   const rSwift   = () => { setSwiftStep(0);   setSwiftBank(null); setSwiftIBAN('');   setSwiftBenef('');  setSwiftAmount(''); setSwiftRef(''); };
   const rSepa    = () => { setSepaStep(0);    setSepaCtry(null);  setSepaIBAN('');    setSepaBenef('');   setSepaAmount(''); setSepaMotif(''); setSepaRef(''); };
   const rInterac = () => { setInteracStep(0); setInteracEmail('');setInteracAmount('');setInteracMsg(''); setInteracRef(''); };
@@ -246,10 +287,16 @@ export default function EliteDashboard() {
         }),
         React.createElement(BkBtn, { label:'Annuler', onClick:()=>setShowPayModal(null) })
       ),
-      momoStep===1 && React.createElement(Sheet, { onClose:rMomo, title:"CHOISIR L'OPERATEUR" }, MOMO_OPERATORS.map(op => React.createElement(OpRow, { key:op.id, color:op.color, name:op.name, sub:op.country, onClick:()=>{ setMomoOp(op); setMomoStep(2); } }))),
+      momoStep===1 && React.createElement(Sheet, { onClose:rMomo, title:"CHOISIR L'OPERATEUR" }, MOMO_OPERATORS.map(op => React.createElement(OpRow, { key:op.id, color:op.color, name:op.name, sub:op.country, onClick:()=>{ setMomoOp(op); setMomoDial(op.prefix); setMomoStep(2); } }))),
       momoStep===2 && momoOp && React.createElement(Sheet, { onClose:rMomo, title:'NUMERO - ' + momoOp.name },
         isMomoSimulation && React.createElement(SimBadge, null),
-        React.createElement(PhoneIn, { prefix:momoOp.prefix, value:momoPhone, onChange:setMomoPhone }),
+        React.createElement(PhoneIn, {
+          prefix: momoDial || momoOp.prefix,
+          prefixes: MOMO_DIAL_CODES[momoOp.id] || [{ code: momoOp.prefix, label: momoOp.prefix }],
+          onPrefixChange: setMomoDial,
+          value: momoPhone,
+          onChange: setMomoPhone
+        }),
         React.createElement(ActBtn, { disabled:momoPhone.length<8, label:'CONTINUER', onClick:()=>setMomoStep(3) }),
         React.createElement(BkBtn, { onClick:()=>setMomoStep(1) })
       ),
@@ -267,7 +314,7 @@ export default function EliteDashboard() {
       ),
       momoStep===5 && React.createElement(Sheet, { onClose:rMomo, title:'CONFIRMER' },
         isMomoSimulation && React.createElement(SimBadge, null),
-        React.createElement(Recap, { rows:[{l:'Operateur',v:momoOp?.name},{l:'Beneficiaire',v:momoOp?.prefix+' '+momoPhone},{l:'Montant',v:parseInt(momoAmount).toLocaleString('fr-FR')+' FCFA'},{l:'USD',v:'$'+momoUsd},{l:'Protocole',v:'FIX 4.4'}] }),
+        React.createElement(Recap, { rows:[{l:'Operateur',v:momoOp?.name},{l:'Beneficiaire',v:(momoDial || momoOp?.prefix)+' '+momoPhone},{l:'Montant',v:parseInt(momoAmount).toLocaleString('fr-FR')+' FCFA'},{l:'USD',v:'$'+momoUsd},{l:'Protocole',v:'FIX 4.4'}] }),
         React.createElement(ActBtn, { disabled:momoProc, label:momoProc?'TRAITEMENT...':'EXECUTER', onClick:execMomo }),
         momoProc && React.createElement(PBar, null),
         React.createElement(BkBtn, { onClick:()=>setMomoStep(4) })
@@ -338,7 +385,7 @@ function PBtn({icon,label,onClick,row}){ return React.createElement('button',{on
 function BigBtn({icon,bg,title,sub,onClick}){ const g="#D4AF37"; return React.createElement('button',{onClick,style:{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'22px',background:'#000',borderRadius:'24px',cursor:'pointer',border:'1.5px solid '+g,boxSizing:'border-box',marginBottom:'12px'}},React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'14px'}},React.createElement('div',{style:{background:bg,borderRadius:'50%',width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}},icon),React.createElement('div',{style:{textAlign:'left'}},React.createElement('div',{style:{fontWeight:'900',color:g,fontSize:'13px',letterSpacing:'1px'}},title),React.createElement('div',{style:{fontSize:'10px',color:'#888',marginTop:2}},sub))),React.createElement(Icons.ArrowRightCircle,{size:20,color:g})); }
 function Sheet({children,title,onClose}){ return React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:3000,display:'flex',alignItems:'flex-end'}},React.createElement('div',{style:{background:'#FFF',width:'100%',padding:'32px 28px 48px',borderTopLeftRadius:'40px',borderTopRightRadius:'40px',maxHeight:'92vh',overflowY:'auto'}},React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:title?'24px':'8px'}},title&&React.createElement('h3',{style:{fontWeight:'900',fontSize:'15px',letterSpacing:'1px'}},title),React.createElement('button',{onClick:onClose,style:{background:'none',border:'none',cursor:'pointer',marginLeft:'auto'}},React.createElement(Icons.X,{size:22,color:'#999'}))),children)); }
 function OpRow({color,name,sub,onClick}){ return React.createElement('button',{onClick,style:{width:'100%',display:'flex',alignItems:'center',gap:'14px',padding:'16px 18px',background:'#F8F8F8',border:'none',borderRadius:'16px',cursor:'pointer',textAlign:'left',marginBottom:'8px'}},React.createElement('div',{style:{width:38,height:38,borderRadius:'50%',background:color,flexShrink:0}}),React.createElement('div',{style:{flex:1}},React.createElement('div',{style:{fontWeight:'800',fontSize:'13px'}},name),React.createElement('div',{style:{fontSize:'10px',color:'#999',marginTop:2}},sub)),React.createElement(Icons.ChevronRight,{size:16,color:'#CCC'})); }
-function PhoneIn({prefix,value,onChange}){ const g="#D4AF37"; return React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'10px',background:'#F8F8F8',borderRadius:'16px',padding:'16px 18px',border:'1.5px solid '+(value.length>5?g:'#EEE'),marginBottom:'16px'}},React.createElement('span',{style:{fontWeight:'700',color:'#999',fontSize:'14px'}},prefix),React.createElement('input',{type:'tel',placeholder:'XX XXX XX XX',value,onChange:e=>onChange(e.target.value.replace(/\D/g,'').slice(0,10)),style:{border:'none',background:'none',fontSize:'18px',fontWeight:'700',flex:1,outline:'none',letterSpacing:'2px'},autoFocus:true})); }
+function PhoneIn({prefix,prefixes,onPrefixChange,value,onChange}){ const g="#D4AF37"; return React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'10px',background:'#F8F8F8',borderRadius:'16px',padding:'16px 18px',border:'1.5px solid '+(value.length>5?g:'#EEE'),marginBottom:'16px'}},React.createElement('select',{value:prefix,onChange:e=>onPrefixChange(e.target.value),style:{border:'1px solid #E5E5E5',background:'#FFF',borderRadius:'12px',padding:'10px 12px',fontWeight:'800',fontSize:'13px',color:'#000',outline:'none',minWidth:'146px',maxWidth:'55%'}},(prefixes||[]).map((p)=>React.createElement('option',{key:p.code,value:p.code},p.label))),React.createElement('input',{type:'tel',placeholder:'XX XXX XX XX',value,onChange:e=>onChange(e.target.value.replace(/\D/g,'').slice(0,12)),style:{border:'none',background:'none',fontSize:'18px',fontWeight:'700',flex:1,outline:'none',letterSpacing:'2px',minWidth:0},autoFocus:true})); }
 function InpF({label,value,onChange,placeholder,mono}){ const g="#D4AF37"; return React.createElement('div',{style:{marginBottom:'12px'}},React.createElement('div',{style:{fontSize:'9px',fontWeight:'800',letterSpacing:'1.5px',color:'#999',marginBottom:'6px'}},label),React.createElement('input',{value,onChange:e=>onChange(e.target.value),placeholder,style:{width:'100%',padding:'14px 16px',border:'1.5px solid '+(value?g:'#EEE'),borderRadius:'14px',fontSize:'14px',fontWeight:mono?'600':'700',outline:'none',background:'#F8F8F8',boxSizing:'border-box',fontFamily:mono?'monospace':'inherit'},autoComplete:'off'})); }
 function AmtIn({value,onChange,currency,equiv,amounts}){ const g="#D4AF37"; return React.createElement('div',{style:{marginBottom:'16px'}},React.createElement('div',{style:{background:'#F8F8F8',borderRadius:'16px',padding:'20px',border:'1.5px solid '+(value?g:'#EEE'),textAlign:'center',marginBottom:'12px'}},React.createElement('input',{type:'number',placeholder:'0',value,onChange:e=>onChange(e.target.value),style:{border:'none',background:'none',fontSize:'32px',fontWeight:'900',width:'100%',textAlign:'center',outline:'none',color:'#000'},autoFocus:true}),React.createElement('div',{style:{fontSize:'11px',color:'#999',fontWeight:'700',letterSpacing:'1px'}},currency)),value&&React.createElement('div',{style:{background:'#000',borderRadius:'12px',padding:'12px 16px',display:'flex',justifyContent:'space-between',marginBottom:'12px'}},React.createElement('span',{style:{color:'#888',fontSize:'11px'}},'Equivalent'),React.createElement('span',{style:{color:g,fontWeight:'900',fontSize:'15px'}},equiv)),React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}},amounts.map(a=>React.createElement('button',{key:a,onClick:()=>onChange(String(a)),style:{padding:'12px 6px',background:value===String(a)?'#000':'#F8F8F8',color:value===String(a)?g:'#000',border:value===String(a)?'1px solid '+g:'1px solid #EEE',borderRadius:'12px',fontWeight:'800',fontSize:'12px',cursor:'pointer'}},a.toLocaleString())))); }
 function PinPad({pin,onP,label}){ const g="#D4AF37"; return React.createElement('div',{style:{textAlign:'center',marginBottom:'20px'}},React.createElement('p',{style:{fontSize:'12px',color:'#999',marginBottom:'20px'}},'Code PIN - '+label),React.createElement('div',{style:{display:'flex',justifyContent:'center',gap:'16px',marginBottom:'24px'}},[0,1,2,3].map(i=>React.createElement('div',{key:i,style:{width:50,height:50,borderRadius:'50%',border:'2px solid '+(pin.length>i?g:'#E0E0E0'),background:pin.length>i?g:'transparent',transition:'all 0.2s'}}))),React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'16px'}},['1','2','3','4','5','6','7','8','9','','0','del'].map((k,i)=>React.createElement('button',{key:i,onClick:()=>k&&onP(k),style:{padding:'18px',background:k===''?'transparent':'#F8F8F8',border:'none',borderRadius:'14px',fontSize:k==='del'?'14px':'20px',fontWeight:'700',cursor:k?'pointer':'default',color:k==='del'?'#999':'#000'}},k==='del'?'<--':k)))); }
