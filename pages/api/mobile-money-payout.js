@@ -1,23 +1,27 @@
 import crypto from 'crypto';
 
+function envValue(key, fallback = '') {
+  return String(process.env[key] ?? fallback).trim();
+}
+
 function providerConfig(provider) {
   const map = {
     mtn: {
       name: 'MTN_MOMO',
-      baseUrl: process.env.MTN_MOMO_API_BASE_URL,
-      path: process.env.MTN_MOMO_PAYOUT_PATH || '/payouts',
+      baseUrl: envValue('MTN_MOMO_API_BASE_URL'),
+      path: envValue('MTN_MOMO_PAYOUT_PATH', '/payouts'),
       required: ['MTN_MOMO_API_BASE_URL', 'MTN_MOMO_API_KEY']
     },
     mpesa: {
       name: 'MPESA',
-      baseUrl: process.env.MPESA_API_BASE_URL,
-      path: process.env.MPESA_PAYOUT_PATH || '/payouts',
+      baseUrl: envValue('MPESA_API_BASE_URL'),
+      path: envValue('MPESA_PAYOUT_PATH', '/payouts'),
       required: ['MPESA_API_BASE_URL', 'MPESA_API_KEY']
     },
     orange: {
       name: 'ORANGE_MONEY',
-      baseUrl: process.env.ORANGE_MONEY_API_BASE_URL,
-      path: process.env.ORANGE_MONEY_PAYOUT_PATH || '/payouts',
+      baseUrl: envValue('ORANGE_MONEY_API_BASE_URL'),
+      path: envValue('ORANGE_MONEY_PAYOUT_PATH', '/payouts'),
       required: ['ORANGE_MONEY_API_BASE_URL', 'ORANGE_MONEY_API_KEY']
     }
   };
@@ -29,11 +33,11 @@ function missingVars(keys) {
 }
 
 function mtnBaseUrl() {
-  return (process.env.MTN_MOMO_API_BASE_URL || 'https://sandbox.momodeveloper.mtn.com').replace(/\/+$/, '');
+  return envValue('MTN_MOMO_API_BASE_URL', 'https://sandbox.momodeveloper.mtn.com').replace(/\/+$/, '');
 }
 
 function mtnTargetEnvironment() {
-  return process.env.MTN_MOMO_TARGET_ENVIRONMENT || 'sandbox';
+  return envValue('MTN_MOMO_TARGET_ENVIRONMENT', 'sandbox');
 }
 
 function parseMaybeJson(raw) {
