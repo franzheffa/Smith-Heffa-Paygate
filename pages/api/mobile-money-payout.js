@@ -218,6 +218,7 @@ export default async function handler(req, res) {
   const reference = String(req.body?.reference || crypto.randomUUID());
   const operation = String(req.body?.operation || 'disbursement').toLowerCase();
   const dryRun = Boolean(req.body?.dryRun ?? true);
+  const simulateFallback = Boolean(req.body?.simulateFallback ?? true);
 
   const cfg = providerConfig(provider);
   if (!cfg) {
@@ -249,10 +250,28 @@ export default async function handler(req, res) {
     operation
   };
 
+  const preflight = preflightReport(provider, cfg);
+  const notReadyForLive = !preflight.ready;
+
   if (dryRun) {
     return res.status(200).json({
       provider: cfg.name,
       status: 'SIMULATED_ACCEPTED',
+      mode: 'DRY_RUN',
+      payload
+    });
+  }
+
+  if (simulateFallback && notReadyForLive) {
+    return res.status(200).json({
+      provider: cfg.name,
+      status: 'SIMULATED_ACCEPTED',
+      mode: 'SIMULATION_FALLBACK',
+      reason: 'Provider configuration is not ready for live execution',
+      diagnostics: {
+        missing: preflight.missing || [],
+        warnings: preflight.warnings || []
+      },
       payload
     });
   }
@@ -266,6 +285,22 @@ export default async function handler(req, res) {
       const result = isCollection
         ? await mtnRequestToPay({ amount, currency, phone, reference, payerMessage, payeeNote })
         : await mtnDisbursementTransfer({ amount, currency, phone, reference, payerMessage, payeeNote });
+
+      if (simulateFallback && !result.ok) {
+        return res.status(200).json({
+          provider: 'MTN_MOMO',
+          operation: isCollection ? 'requesttopay' : 'transfer',
+          referenceId: reference,
+          status: 'SIMULATED_ACCEPTED',
+          mode: 'SIMULATION_FALLBACK',
+          reason: 'MTN live call failed, returned simulation result',
+          upstream: {
+            status: result.status,
+            data: result.data
+          },
+          payload
+        });
+      }
 
       return res.status(result.status).json({
         provider: 'MTN_MOMO',
@@ -293,8 +328,31 @@ export default async function handler(req, res) {
     } catch (_) {
       data = { raw };
     }
+    if (simulateFallback && !response.ok) {
+      return res.status(200).json({
+        provider: cfg.name,
+        status: 'SIMULATED_ACCEPTED',
+        mode: 'SIMULATION_FALLBACK',
+        reason: 'Provider live call failed, returned simulation result',
+        upstream: {
+          status: response.status,
+          data
+        },
+        payload
+      });
+    }
+
     return res.status(response.status).json(data);
   } catch (error) {
+    if (simulateFallback) {
+      return res.status(200).json({
+        provider: cfg?.name,
+        status: 'SIMULATED_ACCEPTED',
+        mode: 'SIMULATION_FALLBACK',
+        reason: 'Provider request threw an exception, returned simulation result',
+        payload
+      });
+    }
     return res.status(500).json({
       error: 'Mobile Money payout failed',
       provider: cfg?.name,
