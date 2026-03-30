@@ -10,7 +10,14 @@ function providerConfig(provider) {
       name: 'MTN_MOMO',
       baseUrl: envValue('MTN_MOMO_API_BASE_URL'),
       path: envValue('MTN_MOMO_PAYOUT_PATH', '/payouts'),
-      required: ['MTN_MOMO_API_BASE_URL', 'MTN_MOMO_API_KEY']
+      required: [
+        'MTN_MOMO_API_BASE_URL',
+        'MTN_MOMO_API_USER_ID',
+        'MTN_MOMO_API_KEY',
+        'MTN_MOMO_TARGET_ENVIRONMENT',
+        'MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY',
+        'MTN_MOMO_DISBURSEMENT_SUBSCRIPTION_KEY'
+      ]
     },
     mpesa: {
       name: 'MPESA',
@@ -30,6 +37,61 @@ function providerConfig(provider) {
 
 function missingVars(keys) {
   return keys.filter((key) => !process.env[key]);
+}
+
+function looksLikePlaceholder(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return true;
+  return v.includes('replace_me') || v.includes('example') || v === 'changeme' || v === 'dummy';
+}
+
+function preflightReport(provider, cfg) {
+  const missing = missingVars(cfg.required);
+  const warnings = [];
+
+  if (!cfg.baseUrl) {
+    warnings.push('Missing base URL value');
+  } else if (looksLikePlaceholder(cfg.baseUrl)) {
+    warnings.push('Base URL still uses placeholder value');
+  }
+
+  if (provider === 'mtn') {
+    const suspectKeys = [
+      'MTN_MOMO_API_USER_ID',
+      'MTN_MOMO_API_KEY',
+      'MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY',
+      'MTN_MOMO_DISBURSEMENT_SUBSCRIPTION_KEY'
+    ];
+    const keyWarnings = suspectKeys.filter((k) => looksLikePlaceholder(envValue(k)));
+    if (keyWarnings.length) {
+      warnings.push(`Suspicious placeholder values: ${keyWarnings.join(', ')}`);
+    }
+    return {
+      provider: cfg.name,
+      ready: missing.length === 0 && warnings.length === 0,
+      missing,
+      warnings,
+      endpoints: {
+        tokenCollection: `${mtnBaseUrl()}/collection/token`,
+        tokenDisbursement: `${mtnBaseUrl()}/disbursement/token`,
+        requestToPay: `${mtnBaseUrl()}/collection/v1_0/requesttopay`,
+        transfer: `${mtnBaseUrl()}/disbursement/v1_0/transfer`
+      }
+    };
+  }
+
+  const apiKeyName = `${cfg.name}_API_KEY`;
+  if (looksLikePlaceholder(envValue(apiKeyName)) || looksLikePlaceholder(envValue('MOBILE_MONEY_API_KEY'))) {
+    warnings.push(`API key appears to be placeholder: ${apiKeyName} or MOBILE_MONEY_API_KEY`);
+  }
+
+  return {
+    provider: cfg.name,
+    ready: missing.length === 0 && warnings.length === 0,
+    missing,
+    warnings,
+    endpoint: `${cfg.baseUrl || ''}${cfg.path || ''}`
+  };
 }
 
 function mtnBaseUrl() {
@@ -163,13 +225,7 @@ export default async function handler(req, res) {
   }
 
   if (action === 'preflight') {
-    const missing = missingVars(cfg.required);
-    return res.status(200).json({
-      provider: cfg.name,
-      ready: missing.length === 0,
-      missing,
-      endpoint: `${cfg.baseUrl || ''}${cfg.path || ''}`
-    });
+    return res.status(200).json(preflightReport(provider, cfg));
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
