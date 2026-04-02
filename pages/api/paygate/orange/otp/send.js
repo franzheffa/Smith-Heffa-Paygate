@@ -20,6 +20,8 @@ export default async function handler(req, res) {
     }
 
     if (!orangeConfig.simulation) {
+      console.log("ORANGE_SMS_CM_ENABLED env:", process.env.ORANGE_SMS_CM_ENABLED);
+      console.log("orangeConfig.countries.CM:", orangeConfig.countries.CM);
       ensureCountryAllowed(countryCode, orangeConfig);
     }
 
