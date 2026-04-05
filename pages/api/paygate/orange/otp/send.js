@@ -1,113 +1,106 @@
-const { generateOtp } = require("../../../../../lib/paygate/auth/generate-otp");
+const crypto = require("crypto");
 const {
-  ORANGE_COUNTRY_LABELS,
-  ensureCountryAllowed,
-  resolveCountryCode,
   withInternationalPlus,
-} = require("../../../../../lib/paygate/orange/countries");
-const { orangeConfig } = require("../../../../../lib/paygate/orange/config");
-const { sendOrangeSms } = require("../../../../../lib/paygate/orange/send-sms");
+  resolveCountryCode,
+  getOrangeRuntimeConfig,
+  getCountryLabel,
+} = require("../../../../../lib/paygate/orange/runtime");
+
+function ensureCountryAllowed(runtime, countryCode) {
+  if (!runtime.smsEnabled) {
+    const error = new Error("Orange SMS disabled");
+    error.code = "ORANGE_SMS_DISABLED";
+    throw error;
+  }
+
+  if (!countryCode || !runtime.countries[countryCode]) {
+    const error = new Error(`Orange country ${countryCode || "UNKNOWN"} disabled`);
+    error.code = "ORANGE_COUNTRY_DISABLED";
+    throw error;
+  }
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function sendSimulation({ countryCode }) {
+  return {
+    ok: true,
+    mode: "simulation",
+    provider: "orange",
+    messageId: `sim-${Date.now()}-${countryCode.toLowerCase()}`,
+  };
+}
+
+function validatePayload(body) {
+  const phoneNumber = withInternationalPlus(body?.phoneNumber);
+  const countryCode = resolveCountryCode(body?.country, phoneNumber);
+
+  if (!phoneNumber) {
+    const error = new Error("phoneNumber is required");
+    error.code = "INVALID_PHONE_NUMBER";
+    throw error;
+  }
+
+  if (!countryCode) {
+    const error = new Error("country is required or must be derivable from phoneNumber");
+    error.code = "INVALID_COUNTRY";
+    throw error;
+  }
+
+  return { phoneNumber, countryCode };
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      ok: false,
-      error: "Method not allowed",
-    });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
   try {
-    const {
-      phoneNumber,
-      phone,
-      countryCode: requestedCountryCode,
-      country,
-    } = req.body || {};
+    const runtime = getOrangeRuntimeConfig();
+    const { phoneNumber, countryCode } = validatePayload(req.body);
 
-    const rawPhoneNumber = phoneNumber || phone;
+    ensureCountryAllowed(runtime, countryCode);
 
-    if (!rawPhoneNumber || typeof rawPhoneNumber !== "string") {
-      return res.status(400).json({
-        ok: false,
-        code: "PHONE_REQUIRED",
-        error: "Phone number is required",
-      });
-    }
+    const otp = generateOtp();
 
-    const to = withInternationalPlus(rawPhoneNumber);
-
-    if (!to) {
-      return res.status(400).json({
-        ok: false,
-        code: "PHONE_INVALID",
-        error: "Invalid phone number",
-      });
-    }
-
-    const countryCode = resolveCountryCode(
-      requestedCountryCode || country,
-      to
-    );
-
-    ensureCountryAllowed(countryCode, orangeConfig);
-
-    const otp = generateOtp(6);
-    const message = `Smith-Heffa Paygate code: ${otp}.\nNe partagez jamais ce code.`;
-
-    const delivery = await sendOrangeSms({
-      to,
-      message,
-    });
-
-    if (!delivery || !delivery.ok) {
-      return res.status(502).json({
-        ok: false,
-        code: "ORANGE_DELIVERY_FAILED",
-        provider: "orange",
-        error: delivery?.error || "Orange SMS delivery failed",
-      });
+    let delivery;
+    if (runtime.simulation) {
+      delivery = await sendSimulation({ countryCode, phoneNumber, otp });
+    } else {
+      const error = new Error("Production Orange SMS transport not wired in this sprint route");
+      error.code = "ORANGE_TRANSPORT_NOT_CONFIGURED";
+      throw error;
     }
 
     return res.status(200).json({
       ok: true,
       provider: "orange",
-      mode: delivery.mode || (orangeConfig.simulation ? "simulation" : "live"),
+      mode: delivery.mode,
       countryCode,
-      countryLabel: ORANGE_COUNTRY_LABELS[countryCode] || countryCode,
-      otpPreview: process.env.NODE_ENV === "production" ? undefined : otp,
+      countryLabel: getCountryLabel(countryCode),
+      otpPreview: runtime.simulation ? otp : undefined,
       delivery,
+      requestId: crypto.randomUUID(),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    console.error("[PayGate - Orange OTP] System Exception:", error?.message || error);
 
-    if (/^Orange country .* disabled$/.test(message)) {
-      return res.status(400).json({
-        ok: false,
-        code: "ORANGE_COUNTRY_DISABLED",
-        error: message,
-      });
-    }
+    const code = error?.code || "INTERNAL_ERROR";
+    const status =
+      code === "INVALID_PHONE_NUMBER" || code === "INVALID_COUNTRY"
+        ? 400
+        : code === "ORANGE_SMS_DISABLED" || code === "ORANGE_COUNTRY_DISABLED"
+          ? 400
+          : code === "ORANGE_TRANSPORT_NOT_CONFIGURED"
+            ? 503
+            : 500;
 
-    if (
-      message === "Orange configuration unavailable" ||
-      message === "Orange countries configuration unavailable" ||
-      message === "Orange SMS disabled" ||
-      message === "Missing Orange credentials"
-    ) {
-      return res.status(503).json({
-        ok: false,
-        code: "ORANGE_CONFIG_ERROR",
-        error: message,
-      });
-    }
-
-    console.error("[PayGate - Orange OTP] System Exception:", error);
-
-    return res.status(500).json({
+    return res.status(status).json({
       ok: false,
-      code: "ORANGE_INTERNAL_ERROR",
-      error: message,
+      code,
+      error: error?.message || "Internal Server Error processing Orange OTP.",
     });
   }
 }
