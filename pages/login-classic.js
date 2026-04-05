@@ -1,280 +1,263 @@
-import { useMemo, useState } from "react";
 import Head from "next/head";
+import { useMemo, useState } from "react";
 
-const COUNTRY_OPTIONS = [
-  { code: "CM", label: "Cameroun", dialCode: "+237", placeholder: "+2376XXXXXXX" },
-  { code: "SN", label: "Sénégal", dialCode: "+221", placeholder: "+221771234567" },
-  { code: "CI", label: "Côte d'Ivoire", dialCode: "+225", placeholder: "+22507XXXXXXX" },
-  { code: "CD", label: "RD Congo", dialCode: "+243", placeholder: "+2438XXXXXXX" },
-  { code: "BF", label: "Burkina Faso", dialCode: "+226", placeholder: "+2267XXXXXXX" },
-  { code: "GN", label: "Guinée", dialCode: "+224", placeholder: "+2246XXXXXXX" },
+const ORANGE_COUNTRIES = [
+  { code: "CM", name: "Cameroun", dialCode: "+237", example: "+2376XXXXXXX" },
+  { code: "SN", name: "Sénégal", dialCode: "+221", example: "+221771234567" },
+  { code: "CI", name: "Côte d’Ivoire", dialCode: "+225", example: "+22507XXXXXXX" },
+  { code: "CD", name: "RD Congo", dialCode: "+243", example: "+2438XXXXXXX" },
+  { code: "BF", name: "Burkina Faso", dialCode: "+226", example: "+2267XXXXXXX" },
+  { code: "GN", name: "Guinée", dialCode: "+224", example: "+2246XXXXXXX" },
 ];
 
-function getCountryMeta(code) {
-  return COUNTRY_OPTIONS.find((item) => item.code === code) || COUNTRY_OPTIONS[0];
-}
+const shell = {
+  page: {
+    minHeight: "100vh",
+    background: "#f6f3eb",
+    color: "#111111",
+    fontFamily:
+      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    padding: "48px 16px",
+  },
+  wrap: {
+    maxWidth: 860,
+    margin: "0 auto",
+  },
+  card: {
+    background: "#ffffff",
+    border: "1px solid #e7dcc4",
+    borderRadius: 28,
+    overflow: "hidden",
+    boxShadow: "0 24px 80px rgba(0,0,0,0.08)",
+  },
+  hero: {
+    background: "#0b0b0b",
+    color: "#ffffff",
+    padding: "28px 28px 24px",
+  },
+  eyebrow: {
+    fontSize: 12,
+    letterSpacing: "0.28em",
+    textTransform: "uppercase",
+    color: "#d4b26a",
+    margin: 0,
+  },
+  h1: {
+    margin: "14px 0 8px",
+    fontSize: 34,
+    lineHeight: 1.1,
+    fontWeight: 800,
+  },
+  heroText: {
+    margin: 0,
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 15,
+    lineHeight: 1.6,
+  },
+  body: {
+    padding: 28,
+    display: "grid",
+    gap: 20,
+  },
+  section: {
+    borderRadius: 22,
+    border: "1px solid #eadfca",
+    background: "#fcfaf5",
+    padding: 22,
+  },
+  h2: {
+    margin: "0 0 8px",
+    fontSize: 22,
+    lineHeight: 1.2,
+    fontWeight: 800,
+  },
+  p: {
+    margin: "0 0 18px",
+    color: "#3d3322",
+    fontSize: 15,
+    lineHeight: 1.6,
+  },
+  form: {
+    display: "grid",
+    gap: 16,
+  },
+  label: {
+    display: "grid",
+    gap: 8,
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#17120b",
+  },
+  input: {
+    width: "100%",
+    height: 52,
+    borderRadius: 16,
+    border: "1px solid #d8c9aa",
+    background: "#fffdf8",
+    padding: "0 16px",
+    fontSize: 16,
+    color: "#111111",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+  row: {
+    display: "grid",
+    gap: 16,
+    gridTemplateColumns: "1fr 1fr",
+  },
+  actions: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  primaryBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 170,
+    height: 52,
+    borderRadius: 16,
+    border: "1px solid #0b0b0b",
+    background: "#0b0b0b",
+    color: "#d4b26a",
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    textDecoration: "none",
+    cursor: "pointer",
+    padding: "0 20px",
+  },
+  secondaryBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 120,
+    height: 52,
+    borderRadius: 16,
+    border: "1px solid #d8d8d8",
+    background: "#ffffff",
+    color: "#111111",
+    fontWeight: 700,
+    textDecoration: "none",
+    cursor: "pointer",
+    padding: "0 20px",
+  },
+  status: {
+    minHeight: 24,
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: "#5c4a1f",
+    fontWeight: 700,
+  },
+  hint: {
+    marginTop: -2,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "#6a5730",
+    fontWeight: 600,
+  },
+  footerNote: {
+    borderRadius: 16,
+    background: "#faf7ef",
+    border: "1px solid #eadfca",
+    padding: 16,
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: "#4a3b22",
+  },
+};
 
 export default function LoginClassicPage() {
   const [email, setEmail] = useState("franz@buttertech.io");
   const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginMessage, setLoginMessage] = useState("");
+
   const [country, setCountry] = useState("CM");
-  const [phoneNumber, setPhoneNumber] = useState(getCountryMeta("CM").placeholder);
-  const [loading, setLoading] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("+2376XXXXXXX");
   const [otpLoading, setOtpLoading] = useState(false);
-  const [status, setStatus] = useState("");
-  const [otpStatus, setOtpStatus] = useState("");
+  const [otpMessage, setOtpMessage] = useState("");
 
-  const selectedCountry = getCountryMeta(country);
+  const currentCountry = useMemo(() => {
+    return ORANGE_COUNTRIES.find((item) => item.code === country) || ORANGE_COUNTRIES[0];
+  }, [country]);
 
-  const shell = useMemo(
-    () => ({
-      page: {
-        minHeight: "100vh",
-        background: "#f6f3eb",
-        color: "#111111",
-        fontFamily:
-          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        padding: "48px 16px",
-      },
-      wrap: {
-        maxWidth: 860,
-        margin: "0 auto",
-      },
-      card: {
-        background: "#ffffff",
-        border: "1px solid #e7dcc4",
-        borderRadius: 28,
-        overflow: "hidden",
-        boxShadow: "0 24px 80px rgba(0,0,0,0.08)",
-      },
-      hero: {
-        background: "#0b0b0b",
-        color: "#ffffff",
-        padding: "28px 28px 24px",
-      },
-      eyebrow: {
-        fontSize: 12,
-        letterSpacing: "0.28em",
-        textTransform: "uppercase",
-        color: "#d4b26a",
-        margin: 0,
-      },
-      title: {
-        margin: "14px 0 8px",
-        fontSize: 34,
-        lineHeight: 1.1,
-        fontWeight: 800,
-      },
-      subtitle: {
-        margin: 0,
-        color: "rgba(255,255,255,0.72)",
-        fontSize: 15,
-        lineHeight: 1.6,
-      },
-      content: {
-        padding: 28,
-        display: "grid",
-        gap: 20,
-      },
-      panel: {
-        borderRadius: 22,
-        border: "1px solid #eadfca",
-        background: "#fcfaf5",
-        padding: 22,
-      },
-      panelTitle: {
-        margin: "0 0 8px",
-        fontSize: 22,
-        lineHeight: 1.2,
-        fontWeight: 800,
-      },
-      panelText: {
-        margin: "0 0 18px",
-        color: "#3d3322",
-        fontSize: 15,
-        lineHeight: 1.6,
-      },
-      grid: {
-        display: "grid",
-        gap: 16,
-      },
-      row2: {
-        display: "grid",
-        gap: 16,
-        gridTemplateColumns: "1fr 1fr",
-      },
-      label: {
-        display: "grid",
-        gap: 8,
-        fontSize: 15,
-        fontWeight: 700,
-        color: "#17120b",
-      },
-      input: {
-        width: "100%",
-        height: 52,
-        borderRadius: 16,
-        border: "1px solid #d8c9aa",
-        background: "#fffdf8",
-        padding: "0 16px",
-        fontSize: 16,
-        color: "#111111",
-        outline: "none",
-        boxSizing: "border-box",
-      },
-      select: {
-        width: "100%",
-        height: 52,
-        borderRadius: 16,
-        border: "1px solid #d8c9aa",
-        background: "#fffdf8",
-        padding: "0 16px",
-        fontSize: 16,
-        color: "#111111",
-        outline: "none",
-        boxSizing: "border-box",
-      },
-      hint: {
-        marginTop: -2,
-        fontSize: 13,
-        lineHeight: 1.5,
-        color: "#6a5730",
-        fontWeight: 600,
-      },
-      actions: {
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-        alignItems: "center",
-      },
-      primary: {
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 170,
-        height: 52,
-        borderRadius: 16,
-        border: "1px solid #0b0b0b",
-        background: "#0b0b0b",
-        color: "#d4b26a",
-        fontWeight: 800,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        textDecoration: "none",
-        cursor: "pointer",
-        padding: "0 20px",
-      },
-      secondary: {
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 120,
-        height: 52,
-        borderRadius: 16,
-        border: "1px solid #d8d8d8",
-        background: "#ffffff",
-        color: "#111111",
-        fontWeight: 700,
-        textDecoration: "none",
-        cursor: "pointer",
-        padding: "0 20px",
-      },
-      status: {
-        minHeight: 24,
-        fontSize: 14,
-        lineHeight: 1.6,
-        color: "#5c4a1f",
-        fontWeight: 700,
-      },
-      footerNote: {
-        borderRadius: 16,
-        background: "#faf7ef",
-        border: "1px solid #eadfca",
-        padding: 16,
-        fontSize: 14,
-        lineHeight: 1.6,
-        color: "#4a3b22",
-      },
-    }),
-    []
-  );
-
-  async function handleClassicLogin(event) {
+  async function handleLoginSubmit(event) {
     event.preventDefault();
-    setLoading(true);
-    setStatus("");
+    setLoginLoading(true);
+    setLoginMessage("");
 
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          email: String(email || "").trim(),
-          password,
-        }),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || payload?.ok !== true) {
-        throw new Error(payload?.error || "Connexion impossible.");
+      if (!response.ok || !data?.ok) {
+        setLoginMessage(data?.error || "Connexion impossible pour le moment.");
+        setLoginLoading(false);
+        return;
       }
 
-      setStatus("Connexion réussie. Redirection vers le dashboard...");
-      window.location.assign("/dashboard");
+      setLoginMessage("Connexion réussie. Redirection...");
+      window.location.assign("/");
     } catch (error) {
-      setStatus(error?.message || "Connexion impossible.");
-    } finally {
-      setLoading(false);
+      setLoginMessage("Connexion impossible pour le moment.");
+      setLoginLoading(false);
     }
   }
 
-  async function handleOtpQuickTest(event) {
+  async function handleOtpSubmit(event) {
     event.preventDefault();
     setOtpLoading(true);
-    setOtpStatus("");
+    setOtpMessage("");
 
     try {
       const response = await fetch("/api/paygate/orange/otp/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           country,
           phoneNumber,
         }),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || payload?.ok !== true) {
-        throw new Error(payload?.error || "OTP Orange impossible.");
+      if (!response.ok || !data?.ok) {
+        setOtpMessage(data?.error || "Envoi impossible pour le moment.");
+        setOtpLoading(false);
+        return;
       }
 
-      const parts = [
-        "OTP Orange accepté.",
-        payload?.countryCode ? `Pays: ${payload.countryCode}.` : "",
-        payload?.mode ? `Mode: ${payload.mode}.` : "",
-        payload?.requestId ? `RequestId: ${payload.requestId}.` : "",
-        payload?.otpPreview ? `OTP preview: ${payload.otpPreview}.` : "",
-      ].filter(Boolean);
-
-      setOtpStatus(parts.join(" "));
+      setOtpMessage("Code envoyé avec succès.");
     } catch (error) {
-      setOtpStatus(error?.message || "OTP Orange impossible.");
+      setOtpMessage("Envoi impossible pour le moment.");
     } finally {
       setOtpLoading(false);
     }
+  }
+
+  function handleCountryChange(event) {
+    const nextCode = event.target.value;
+    const nextCountry =
+      ORANGE_COUNTRIES.find((item) => item.code === nextCode) || ORANGE_COUNTRIES[0];
+
+    setCountry(nextCode);
+    setPhoneNumber(nextCountry.example);
+    setOtpMessage("");
   }
 
   return (
     <>
       <Head>
         <title>Login classique · Smith-Heffa Paygate</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <main style={shell.page}>
@@ -282,22 +265,20 @@ export default function LoginClassicPage() {
           <div style={shell.card}>
             <section style={shell.hero}>
               <p style={shell.eyebrow}>Buttertech · Smith-Heffa Paygate</p>
-              <h1 style={shell.title}>Login classique</h1>
-              <p style={shell.subtitle}>
-                Point d’entrée stable pour continuer le déploiement pendant que
-                le rail Orange reste prioritaire.
+              <h1 style={shell.h1}>Login classique</h1>
+              <p style={shell.heroText}>
+                Accédez à votre espace en toute simplicité.
               </p>
             </section>
 
-            <section style={shell.content}>
-              <section style={shell.panel}>
-                <h2 style={shell.panelTitle}>Connexion email / mot de passe</h2>
-                <p style={shell.panelText}>
-                  Ce formulaire garde une UX propre avec redirection directe
-                  après succès.
+            <section style={shell.body}>
+              <section style={shell.section}>
+                <h2 style={shell.h2}>Connexion</h2>
+                <p style={shell.p}>
+                  Utilisez votre email et votre mot de passe pour continuer.
                 </p>
 
-                <form onSubmit={handleClassicLogin} style={shell.grid}>
+                <form style={shell.form} onSubmit={handleLoginSubmit}>
                   <label style={shell.label}>
                     Email
                     <input
@@ -305,10 +286,10 @@ export default function LoginClassicPage() {
                       type="email"
                       name="email"
                       autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="franz@buttertech.io"
                       required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
                     />
                   </label>
 
@@ -319,50 +300,45 @@ export default function LoginClassicPage() {
                       type="password"
                       name="password"
                       autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="Votre mot de passe"
                       required
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
                     />
                   </label>
 
                   <div style={shell.actions}>
-                    <button type="submit" style={shell.primary} disabled={loading}>
-                      {loading ? "Connexion..." : "Se connecter"}
+                    <button type="submit" style={shell.primaryBtn} disabled={loginLoading}>
+                      {loginLoading ? "Connexion..." : "Se connecter"}
                     </button>
 
-                    <a href="/auth/login" style={shell.secondary}>
+                    <a href="/auth/login" style={shell.secondaryBtn}>
                       Retour
                     </a>
                   </div>
 
-                  <div style={shell.status}>{status}</div>
+                  <div style={shell.status}>{loginMessage}</div>
                 </form>
               </section>
 
-              <section style={shell.panel}>
-                <h2 style={shell.panelTitle}>Orange OTP quick test</h2>
-                <p style={shell.panelText}>
-                  Validation rapide du runtime Orange avant branchement transport réel.
+              <section style={shell.section}>
+                <h2 style={shell.h2}>Test rapide Orange</h2>
+                <p style={shell.p}>
+                  Vérifiez l’envoi d’un code sur les pays actifs avant le branchement final.
                 </p>
 
-                <form onSubmit={handleOtpQuickTest} style={shell.grid}>
-                  <div style={shell.row2}>
+                <form style={shell.form} onSubmit={handleOtpSubmit}>
+                  <div style={shell.row}>
                     <label style={shell.label}>
                       Pays
                       <select
-                        style={shell.select}
+                        style={shell.input}
                         value={country}
-                        onChange={(e) => {
-                          const nextCode = e.target.value;
-                          const nextMeta = getCountryMeta(nextCode);
-                          setCountry(nextCode);
-                          setPhoneNumber(nextMeta.placeholder);
-                        }}
+                        onChange={handleCountryChange}
                       >
-                        {COUNTRY_OPTIONS.map((item) => (
+                        {ORANGE_COUNTRIES.map((item) => (
                           <option key={item.code} value={item.code}>
-                            {item.code} - {item.label} ({item.dialCode})
+                            {item.name}
                           </option>
                         ))}
                       </select>
@@ -373,31 +349,26 @@ export default function LoginClassicPage() {
                       <input
                         style={shell.input}
                         type="text"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder={selectedCountry.placeholder}
+                        placeholder={currentCountry.example}
                         required
+                        value={phoneNumber}
+                        onChange={(event) => setPhoneNumber(event.target.value)}
                       />
                       <span style={shell.hint}>
-                        Indicatif: {selectedCountry.dialCode} · Exemple: {selectedCountry.placeholder}
+                        Indicatif {currentCountry.dialCode} · Exemple {currentCountry.example}
                       </span>
                     </label>
                   </div>
 
                   <div style={shell.actions}>
-                    <button type="submit" style={shell.primary} disabled={otpLoading}>
-                      {otpLoading ? "Envoi..." : "Envoyer OTP Orange"}
+                    <button type="submit" style={shell.primaryBtn} disabled={otpLoading}>
+                      {otpLoading ? "Envoi..." : "Envoyer le code"}
                     </button>
                   </div>
 
-                  <div style={shell.status}>{otpStatus}</div>
+                  <div style={shell.status}>{otpMessage}</div>
                 </form>
               </section>
-
-              <div style={shell.footerNote}>
-                Pays activés côté UI: Cameroun, Sénégal, Côte d’Ivoire, RD Congo,
-                Burkina Faso, Guinée.
-              </div>
             </section>
           </div>
         </div>
