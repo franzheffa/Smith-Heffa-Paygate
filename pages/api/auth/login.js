@@ -1,14 +1,12 @@
 const bcrypt = require("bcryptjs");
 const { prisma } = require("../../../lib/prisma");
 
-function normalizeValue(value) {
+function normalize(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function parseBody(req) {
-  if (req.body && typeof req.body === "object") {
-    return req.body;
-  }
+  if (req.body && typeof req.body === "object") return req.body;
 
   if (typeof req.body === "string") {
     try {
@@ -23,45 +21,38 @@ function parseBody(req) {
 
 function wantsJson(req) {
   const accept = String(req.headers.accept || "").toLowerCase();
-  const contentType = String(req.headers["content-type"] || "").toLowerCase();
   const requestedWith = String(req.headers["x-requested-with"] || "").toLowerCase();
-  const mode = String((req.query && req.query.responseMode) || "").toLowerCase();
+  const responseMode = String((req.query && req.query.responseMode) || "").toLowerCase();
 
   return (
-    mode === "json" ||
+    responseMode === "json" ||
     requestedWith === "xmlhttprequest" ||
-    accept.includes("application/json") ||
-    contentType.includes("application/json")
+    accept.includes("application/json")
   );
 }
 
 function safeRedirect(target) {
-  const value = normalizeValue(target);
+  const value = normalize(target);
   if (!value) return "/dashboard";
   if (!value.startsWith("/")) return "/dashboard";
   if (value.startsWith("//")) return "/dashboard";
   return value;
 }
 
-function redirectHtml(res, location) {
-  return res.redirect(303, safeRedirect(location));
-}
-
-function setSessionCookie(res, sessionToken) {
-  const maxAge = 60 * 60 * 24 * 14;
-  const isProd = process.env.NODE_ENV === "production";
-  const cookie = [
-    `paygate_session=${encodeURIComponent(sessionToken)}`,
+function setSessionCookie(res, token) {
+  const parts = [
+    `paygate_session=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
-    `Max-Age=${maxAge}`,
-    isProd ? "Secure" : "",
-  ]
-    .filter(Boolean)
-    .join("; ");
+    "Max-Age=1209600",
+  ];
 
-  res.setHeader("Set-Cookie", cookie);
+  if (process.env.NODE_ENV === "production") {
+    parts.push("Secure");
+  }
+
+  res.setHeader("Set-Cookie", parts.join("; "));
 }
 
 module.exports = async function handler(req, res) {
@@ -69,7 +60,7 @@ module.exports = async function handler(req, res) {
     if (wantsJson(req)) {
       return res.status(200).json({ ok: true, loginUrl: "/login-classic" });
     }
-    return redirectHtml(res, "/login-classic");
+    return res.redirect(303, "/login-classic");
   }
 
   if (req.method !== "POST") {
@@ -77,20 +68,20 @@ module.exports = async function handler(req, res) {
     if (wantsJson(req)) {
       return res.status(405).json({ ok: false, error: "Method not allowed." });
     }
-    return redirectHtml(res, "/login-classic?error=method_not_allowed");
+    return res.redirect(303, "/login-classic?error=method_not_allowed");
   }
 
   try {
     const body = parseBody(req);
-    const email = normalizeValue(body.email).toLowerCase();
-    const password = normalizeValue(body.password);
+    const email = normalize(body.email).toLowerCase();
+    const password = normalize(body.password);
     const redirectTo = safeRedirect(body.redirectTo || "/dashboard");
 
     if (!email || !password) {
       if (wantsJson(req)) {
         return res.status(400).json({ ok: false, error: "Email et mot de passe requis." });
       }
-      return redirectHtml(res, "/login-classic?error=missing_credentials");
+      return res.redirect(303, "/login-classic?error=missing_credentials");
     }
 
     const user = await prisma.user.findUnique({
@@ -107,41 +98,37 @@ module.exports = async function handler(req, res) {
       if (wantsJson(req)) {
         return res.status(401).json({ ok: false, error: "Identifiants invalides." });
       }
-      return redirectHtml(res, "/login-classic?error=invalid_credentials");
+      return res.redirect(303, "/login-classic?error=invalid_credentials");
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const ok = await bcrypt.compare(password, user.passwordHash);
 
-    if (!isValid) {
+    if (!ok) {
       if (wantsJson(req)) {
         return res.status(401).json({ ok: false, error: "Identifiants invalides." });
       }
-      return redirectHtml(res, "/login-classic?error=invalid_credentials");
+      return res.redirect(303, "/login-classic?error=invalid_credentials");
     }
 
-    const sessionToken = `${user.id}.${Date.now()}`;
-
-    setSessionCookie(res, sessionToken);
-
-    const payload = {
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name || "",
-      },
-      redirectTo,
-    };
+    setSessionCookie(res, `${user.id}.${Date.now()}`);
 
     if (wantsJson(req)) {
-      return res.status(200).json(payload);
+      return res.status(200).json({
+        ok: true,
+        redirectTo,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name || "",
+        },
+      });
     }
 
-    return redirectHtml(res, redirectTo);
+    return res.redirect(303, redirectTo);
   } catch (error) {
     if (wantsJson(req)) {
       return res.status(500).json({ ok: false, error: "Erreur interne." });
     }
-    return redirectHtml(res, "/login-classic?error=server_error");
+    return res.redirect(303, "/login-classic?error=server_error");
   }
 };
