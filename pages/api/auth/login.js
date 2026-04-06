@@ -35,7 +35,7 @@ function setSessionCookie(res, token) {
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === "GET") {
     if (wantsJson(req)) return res.status(200).json({ ok: true, loginUrl: "/login-classic" });
     return res.redirect(303, "/login-classic");

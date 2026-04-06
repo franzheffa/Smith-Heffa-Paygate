@@ -1,6 +1,6 @@
 const { prisma } = require('../../../lib/prisma');
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     const account = await prisma.authAccount.findUnique({
       where: { email: 'franz@buttertech.io' },
