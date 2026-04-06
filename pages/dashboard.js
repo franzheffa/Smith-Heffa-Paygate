@@ -4,33 +4,20 @@ import Head from 'next/head';
 export default function Dashboard() {
   const [loadingRail, setLoadingRail] = useState(null);
 
-  // Fonction corrigée : Appel POST pour générer la session de paiement
   const triggerPayment = async (rail, apiRoute) => {
     setLoadingRail(rail);
     try {
-      const res = await fetch(apiRoute, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      // Si ton API gère la redirection nativement (HTTP 303)
+      const res = await fetch(apiRoute, { method: 'POST' });
       if (res.redirected) {
         window.location.href = res.url;
         return;
       }
-
       const data = await res.json().catch(() => null);
-      
-      // Si l'API (ex: Stripe) renvoie { url: 'https://checkout.stripe.com/...' }
-      if (data && data.url) {
-        window.location.href = data.url;
-      } else {
-        // Fallback ultime
-        window.location.href = apiRoute;
-      }
+      if (data?.url) window.location.href = data.url;
+      else window.location.href = apiRoute;
     } catch (error) {
-      console.error(`Erreur d'orchestration sur ${rail}:`, error);
-      alert(`Impossible d'initialiser le bac à sable ${rail}.`);
+      console.error(`Erreur ${rail}:`, error);
+      alert(`Impossible de joindre le rail ${rail}`);
     } finally {
       setLoadingRail(null);
     }
@@ -66,7 +53,7 @@ export default function Dashboard() {
                   <p style={{ color: '#52525b', fontSize: '14px', lineHeight: '1.5', marginBottom: '20px' }}>Cartes bancaires (Visa, Mastercard). Redirection vers le bac à sable sécurisé Stripe.</p>
                 </div>
                 <button onClick={() => triggerPayment('Stripe', '/api/stripe-payment-intent')} disabled={loadingRail === 'Stripe'} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#635BFF', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer', opacity: loadingRail === 'Stripe' ? 0.7 : 1 }}>
-                  {loadingRail === 'Stripe' ? 'Génération Session...' : 'Payer avec Stripe'}
+                  {loadingRail === 'Stripe' ? 'Génération...' : 'Payer avec Stripe'}
                 </button>
               </div>
 
@@ -88,7 +75,7 @@ export default function Dashboard() {
                   <p style={{ color: '#52525b', fontSize: '14px', lineHeight: '1.5', marginBottom: '20px' }}>Portefeuille électronique international. Redirection environnement de test Buttertech.</p>
                 </div>
                 <button onClick={() => triggerPayment('PayPal', '/api/paypal-checkout')} disabled={loadingRail === 'PayPal'} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#003087', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer', opacity: loadingRail === 'PayPal' ? 0.7 : 1 }}>
-                  {loadingRail === 'PayPal' ? 'Génération Session...' : 'Payer avec PayPal'}
+                  {loadingRail === 'PayPal' ? 'Génération...' : 'Payer avec PayPal'}
                 </button>
               </div>
 
