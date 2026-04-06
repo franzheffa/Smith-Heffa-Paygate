@@ -151,9 +151,16 @@ export default function AuthLogin() {
           </section>
           
           {/* Trust Banner Google SecOps */}
+            <span style={{ fontSize: '11px', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Protected by</span>
+            <img
+              src="/images/secops-reverse.svg"
+              alt="Google Security Operations"
+              style={{ height: '22px', display: 'block' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
           <div style={{ backgroundColor: '#fafafa', padding: '20px 32px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
             <span style={{ fontSize: '12px', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Protected by</span>
-            <img src="/images/SecOps-512-color-rgb.svg" alt="Google Cloud Security Operations" style={{ height: '24px', opacity: '0.9' }} onError={(e) => { e.target.style.display='none'; }}/>
+            <img src="/images/secops-reverse.svg" alt="Google Cloud Security Operations" style={{ height: '24px', opacity: '0.9' }} onError={(e) => { e.target.style.display='none'; }}/>
             <span style={{ fontSize: '14px', fontWeight: '800', color: '#111' }}>Google Security</span>
           </div>
         </div>
