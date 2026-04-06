@@ -1,127 +1,104 @@
-import Head from "next/head";
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f6f3eb",
-    color: "#111111",
-    fontFamily:
-      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    padding: "48px 16px",
-  },
-  wrap: {
-    maxWidth: 920,
-    margin: "0 auto",
-  },
-  card: {
-    background: "#ffffff",
-    border: "1px solid #e7dcc4",
-    borderRadius: 28,
-    overflow: "hidden",
-    boxShadow: "0 24px 80px rgba(0,0,0,0.08)",
-  },
-  hero: {
-    background: "#0b0b0b",
-    color: "#ffffff",
-    padding: "28px 28px 24px",
-  },
-  eyebrow: {
-    fontSize: 12,
-    letterSpacing: "0.28em",
-    textTransform: "uppercase",
-    color: "#d4b26a",
-    margin: 0,
-  },
-  h1: {
-    margin: "14px 0 8px",
-    fontSize: 34,
-    lineHeight: 1.1,
-    fontWeight: 800,
-  },
-  lead: {
-    margin: 0,
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 15,
-    lineHeight: 1.6,
-  },
-  body: {
-    padding: 28,
-    display: "grid",
-    gap: 18,
-  },
-  grid: {
-    display: "grid",
-    gap: 16,
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  },
-  box: {
-    borderRadius: 20,
-    border: "1px solid #eadfca",
-    background: "#fcfaf5",
-    padding: 20,
-  },
-  title: {
-    margin: "0 0 8px",
-    fontSize: 20,
-    fontWeight: 800,
-  },
-  text: {
-    margin: 0,
-    color: "#4b3d28",
-    fontSize: 15,
-    lineHeight: 1.6,
-  },
-  cta: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 170,
-    height: 52,
-    borderRadius: 16,
-    border: "1px solid #0b0b0b",
-    background: "#0b0b0b",
-    color: "#d4b26a",
-    fontWeight: 800,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    textDecoration: "none",
-    marginTop: 16,
-    padding: "0 20px",
-  },
-};
+import React, { useState } from 'react';
+import Head from 'next/head';
 
 export default function Dashboard() {
+  const [loadingRail, setLoadingRail] = useState(null);
+
+  // Fonction corrigée : Appel POST pour générer la session de paiement
+  const triggerPayment = async (rail, apiRoute) => {
+    setLoadingRail(rail);
+    try {
+      const res = await fetch(apiRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      // Si ton API gère la redirection nativement (HTTP 303)
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      
+      // Si l'API (ex: Stripe) renvoie { url: 'https://checkout.stripe.com/...' }
+      if (data && data.url) {
+        window.location.href = data.url;
+      } else {
+        // Fallback ultime
+        window.location.href = apiRoute;
+      }
+    } catch (error) {
+      console.error(`Erreur d'orchestration sur ${rail}:`, error);
+      alert(`Impossible d'initialiser le bac à sable ${rail}.`);
+    } finally {
+      setLoadingRail(null);
+    }
+  };
+
   return (
     <>
-      <Head>
-        <title>Espace connecté · Smith-Heffa Paygate</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
+      <Head><title>Orchestration des Paiements · Smith-Heffa</title></Head>
+      <main style={{ minHeight: '100vh', backgroundColor: '#f4f4f5', color: '#111', fontFamily: 'system-ui, sans-serif', padding: '40px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#eefbf4', border: '1px solid #c3e8d1', color: '#1b5e3a', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '800', letterSpacing: '0.05em', marginBottom: '24px', textTransform: 'uppercase' }}>
+          <span style={{ width: '8px', height: '8px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 8px #10b981' }}></span>
+          ENV : SANDBOX BUTTERTECH ACTIF
+        </div>
 
-      <main style={styles.page}>
-        <div style={styles.wrap}>
-          <div style={styles.card}>
-            <section style={styles.hero}>
-              <p style={styles.eyebrow}>Buttertech · Smith-Heffa Paygate</p>
-              <h1 style={styles.h1}>Connexion réussie</h1>
-              <p style={styles.lead}>Vous êtes dans votre espace. Le flux email s’arrête ici, proprement.</p>
-            </section>
+        <div style={{ width: '100%', maxWidth: '900px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px -15px rgba(0,0,0,0.1)' }}>
+          <section style={{ backgroundColor: '#09090b', color: '#fff', padding: '32px', borderBottom: '4px solid #d4b26a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h1 style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '800', letterSpacing: '-0.02em' }}>💳 Enterprise Payment Rail</h1>
+              <p style={{ margin: '0', color: '#a1a1aa', fontSize: '15px' }}>Console d'orchestration unifiée. Sélectionnez un rail de paiement.</p>
+            </div>
+            <a href="/api/auth/logout" style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', textDecoration: 'none', fontWeight: '700', fontSize: '14px', border: '1px solid #3f3f46' }}>Déconnexion</a>
+          </section>
 
-            <section style={styles.body}>
-              <div style={styles.grid}>
-                <div style={styles.box}>
-                  <h2 style={styles.title}>Espace principal</h2>
-                  <p style={styles.text}>Reprenez votre travail sans affichage technique ni sortie JSON.</p>
-                  <a href="/auth/login" style={styles.cta}>Accueil</a>
+          <section style={{ padding: '32px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px', color: '#111' }}>🚀 Rails de Paiement Disponibles</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              
+              {/* Stripe */}
+              <div style={{ border: '2px solid #e5e7eb', borderRadius: '16px', padding: '24px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontSize: '24px' }}>🌍</span> Stripe Checkout</h3>
+                  <p style={{ color: '#52525b', fontSize: '14px', lineHeight: '1.5', marginBottom: '20px' }}>Cartes bancaires (Visa, Mastercard). Redirection vers le bac à sable sécurisé Stripe.</p>
                 </div>
-
-                <div style={styles.box}>
-                  <h2 style={styles.title}>Test Orange</h2>
-                  <p style={styles.text}>Accédez au test rapide téléphone si vous voulez vérifier les pays actifs.</p>
-                  <a href="/login-classic#otp" style={styles.cta}>Ouvrir</a>
-                </div>
+                <button onClick={() => triggerPayment('Stripe', '/api/stripe-payment-intent')} disabled={loadingRail === 'Stripe'} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#635BFF', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer', opacity: loadingRail === 'Stripe' ? 0.7 : 1 }}>
+                  {loadingRail === 'Stripe' ? 'Génération Session...' : 'Payer avec Stripe'}
+                </button>
               </div>
-            </section>
+
+              {/* Apple Pay */}
+              <div style={{ border: '2px solid #e5e7eb', borderRadius: '16px', padding: '24px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontSize: '24px' }}>🍏</span> Apple Pay</h3>
+                  <p style={{ color: '#52525b', fontSize: '14px', lineHeight: '1.5', marginBottom: '20px' }}>Paiement biométrique rapide via l'écosystème Apple. Simulation Sandbox.</p>
+                </div>
+                <button onClick={() => triggerPayment('ApplePay', '/api/applepay-checkout')} disabled={loadingRail === 'ApplePay'} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer', opacity: loadingRail === 'ApplePay' ? 0.7 : 1 }}>
+                  {loadingRail === 'ApplePay' ? 'Ouverture...' : 'Payer avec Apple Pay'}
+                </button>
+              </div>
+
+              {/* PayPal */}
+              <div style={{ border: '2px solid #e5e7eb', borderRadius: '16px', padding: '24px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontSize: '24px' }}>🅿️</span> PayPal</h3>
+                  <p style={{ color: '#52525b', fontSize: '14px', lineHeight: '1.5', marginBottom: '20px' }}>Portefeuille électronique international. Redirection environnement de test Buttertech.</p>
+                </div>
+                <button onClick={() => triggerPayment('PayPal', '/api/paypal-checkout')} disabled={loadingRail === 'PayPal'} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#003087', color: '#fff', border: 'none', fontWeight: '800', cursor: 'pointer', opacity: loadingRail === 'PayPal' ? 0.7 : 1 }}>
+                  {loadingRail === 'PayPal' ? 'Génération Session...' : 'Payer avec PayPal'}
+                </button>
+              </div>
+
+            </div>
+          </section>
+
+          <div style={{ backgroundColor: '#fafafa', padding: '20px 32px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Infrastructure certifiée par</span>
+            <img src="/images/SecOps-512-color-rgb.svg" alt="Google Cloud Security Operations" style={{ height: '24px', opacity: '0.9' }} onError={(e) => { e.target.style.display='none'; }}/>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: '#111' }}>Google Security Operations</span>
           </div>
         </div>
       </main>
