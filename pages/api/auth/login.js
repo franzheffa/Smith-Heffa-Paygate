@@ -97,3 +97,4 @@ module.exports = async function handler(req, res) {
     return res.redirect(303, "/login-classic?error=server_error");
   }
 };
+// Ce fichier a déjà le bon contenu — vérification uniquement
