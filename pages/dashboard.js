@@ -17,24 +17,24 @@ const SecOps = () => (
 // Pays Mobile Money avec préfixes
 const MM_COUNTRIES = {
   orange: [
-    { code: 'CM', name: '🇨🇲 Cameroun', prefix: '+237' },
-    { code: 'SN', name: '🇸🇳 Sénégal', prefix: '+221' },
-    { code: 'CI', name: "🇨🇮 Côte d'Ivoire", prefix: '+225' },
-    { code: 'CD', name: '🇨🇩 RD Congo', prefix: '+243' },
-    { code: 'BF', name: '🇧🇫 Burkina Faso', prefix: '+226' },
-    { code: 'GN', name: '🇬🇳 Guinée', prefix: '+224' },
+    { code: 'CM', name: 'CM - Cameroun', prefix: '+237' },
+    { code: 'SN', name: 'SN - Sénégal', prefix: '+221' },
+    { code: 'CI', name: "CI - Côte d'Ivoire", prefix: '+225' },
+    { code: 'CD', name: 'CD - RD Congo', prefix: '+243' },
+    { code: 'BF', name: 'BF - Burkina Faso', prefix: '+226' },
+    { code: 'GN', name: 'GN - Guinée', prefix: '+224' },
   ],
   mtn: [
     { code: 'CM', name: '🇨�� Cameroun', prefix: '+237' },
-    { code: 'GH', name: '🇬🇭 Ghana', prefix: '+233' },
-    { code: 'UG', name: '🇺🇬 Uganda', prefix: '+256' },
-    { code: 'RW', name: '🇷🇼 Rwanda', prefix: '+250' },
-    { code: 'ZM', name: '🇿🇲 Zambie', prefix: '+260' },
+    { code: 'GH', name: 'GH - Ghana', prefix: '+233' },
+    { code: 'UG', name: 'UG - Uganda', prefix: '+256' },
+    { code: 'RW', name: 'RW - Rwanda', prefix: '+250' },
+    { code: 'ZM', name: 'ZM - Zambie', prefix: '+260' },
   ],
   mpesa: [
     { code: 'KE', name: '��🇪 Kenya', prefix: '+254' },
-    { code: 'TZ', name: '🇹🇿 Tanzanie', prefix: '+255' },
-    { code: 'MZ', name: '🇲🇿 Mozambique', prefix: '+258' },
+    { code: 'TZ', name: 'TZ - Tanzanie', prefix: '+255' },
+    { code: 'MZ', name: 'MZ - Mozambique', prefix: '+258' },
   ],
 };
 

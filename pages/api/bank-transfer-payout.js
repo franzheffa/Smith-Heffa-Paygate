@@ -15,6 +15,14 @@ function railConfig(rail) {
       required: ['SEPA_API_BASE_URL', 'SEPA_API_KEY']
     };
   }
+  if (rail === 'interac') {
+    return {
+      name: 'INTERAC',
+      baseUrl: process.env.INTERAC_API_BASE_URL || 'https://api.interac.ca/v1',
+      path: '/etransfer/v2/send',
+      required: ['INTERAC_API_BASE_URL', 'INTERAC_API_KEY']
+    };
+  }
   return null;
 }
 
