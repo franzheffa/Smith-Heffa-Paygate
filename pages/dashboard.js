@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
 
+const GOLD = '#C6A85B';
+const BLACK = '#09090b';
+
 const SecOps = () => (
   <svg height="20" viewBox="0 0 340 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
     <path d="M28 3L6 12v18c0 12 9 23 22 27 13-4 22-15 22-27V12Z" fill="none" stroke="#4285F4" strokeWidth="3" strokeLinejoin="round"/>
@@ -11,203 +14,300 @@ const SecOps = () => (
   </svg>
 );
 
-const RAILS = [
-  {
-    id: 'Stripe',
-    icon: '🌍',
-    label: 'Stripe Checkout',
-    desc: 'Cartes bancaires (Visa, Mastercard, Amex). Bac à sable sécurisé Buttertech.',
-    route: '/api/stripe-payment-intent',
-    color: '#635BFF',
-    section: 'International',
-  },
-  {
-    id: 'ApplePay',
-    icon: '🍏',
-    label: 'Apple Pay',
-    desc: 'Paiement biométrique via l\'écosystème Apple. Sandbox activé.',
-    route: '/api/applepay-checkout',
-    color: '#000000',
-    section: 'International',
-  },
-  {
-    id: 'PayPal',
-    icon: '🅿️',
-    label: 'PayPal',
-    desc: 'Portefeuille électronique international. Environnement de test Buttertech.',
-    route: '/api/paypal-checkout',
-    color: '#003087',
-    section: 'International',
-  },
-  {
-    id: 'OrangeMoney',
-    icon: '🟠',
-    label: 'Orange Money',
-    desc: 'Mobile Money — CM, SN, CI, CD, BF, GN. Paiement par numéro de téléphone.',
-    route: '/api/mobile-money-payout',
-    body: { provider: 'orange' },
-    color: '#FF6600',
-    section: 'Mobile Money Afrique',
-  },
-  {
-    id: 'MTN',
-    icon: '🟡',
-    label: 'MTN MoMo',
-    desc: 'Mobile Money MTN — Cameroun, Ghana, Uganda, Rwanda, Zambie.',
-    route: '/api/mobile-money-payout',
-    body: { provider: 'mtn' },
-    color: '#FFC107',
-    textColor: '#111',
-    section: 'Mobile Money Afrique',
-  },
-  {
-    id: 'MPESA',
-    icon: '🟢',
-    label: 'M-Pesa',
-    desc: 'Mobile Money Safaricom — Kenya, Tanzanie, Mozambique.',
-    route: '/api/mobile-money-payout',
-    body: { provider: 'mpesa' },
-    color: '#00A550',
-    section: 'Mobile Money Afrique',
-  },
-  {
-    id: 'SEPA',
-    icon: '🏦',
-    label: 'SEPA Virement',
-    desc: 'Virement bancaire zone Euro. Délai J+1. IBAN requis.',
-    route: '/api/bank-transfer-payout',
-    body: { method: 'sepa' },
-    color: '#1a56db',
-    section: 'Virements Bancaires',
-  },
-  {
-    id: 'SWIFT',
-    icon: '🌐',
-    label: 'SWIFT / Wire',
-    desc: 'Virement international SWIFT. Multi-devises. Délai 1-3 jours ouvrés.',
-    route: '/api/bank-transfer-payout',
-    body: { method: 'swift' },
-    color: '#374151',
-    section: 'Virements Bancaires',
-  },
-  {
-    id: 'Interac',
-    icon: '🍁',
-    label: 'Interac e-Transfer',
-    desc: 'Virement instantané canadien. CAD uniquement. Réseau bancaire canadien.',
-    route: '/api/bank-transfer-payout',
-    body: { method: 'interac' },
-    color: '#ef4444',
-    section: 'Virements Bancaires',
-  },
-];
+// Pays Mobile Money avec préfixes
+const MM_COUNTRIES = {
+  orange: [
+    { code: 'CM', name: '🇨🇲 Cameroun', prefix: '+237' },
+    { code: 'SN', name: '🇸🇳 Sénégal', prefix: '+221' },
+    { code: 'CI', name: "🇨🇮 Côte d'Ivoire", prefix: '+225' },
+    { code: 'CD', name: '🇨🇩 RD Congo', prefix: '+243' },
+    { code: 'BF', name: '🇧🇫 Burkina Faso', prefix: '+226' },
+    { code: 'GN', name: '🇬🇳 Guinée', prefix: '+224' },
+  ],
+  mtn: [
+    { code: 'CM', name: '🇨�� Cameroun', prefix: '+237' },
+    { code: 'GH', name: '🇬🇭 Ghana', prefix: '+233' },
+    { code: 'UG', name: '🇺🇬 Uganda', prefix: '+256' },
+    { code: 'RW', name: '🇷🇼 Rwanda', prefix: '+250' },
+    { code: 'ZM', name: '🇿🇲 Zambie', prefix: '+260' },
+  ],
+  mpesa: [
+    { code: 'KE', name: '��🇪 Kenya', prefix: '+254' },
+    { code: 'TZ', name: '🇹🇿 Tanzanie', prefix: '+255' },
+    { code: 'MZ', name: '🇲🇿 Mozambique', prefix: '+258' },
+  ],
+};
 
-const SECTIONS = ['International', 'Mobile Money Afrique', 'Virements Bancaires'];
+// Formulaire Mobile Money
+function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
+  const countries = MM_COUNTRIES[provider] || [];
+  const [country, setCountry] = useState(countries[0]?.code || '');
+  const [phone, setPhone] = useState('');
+  const [amount, setAmount] = useState('');
+  const prefix = countries.find(c => c.code === country)?.prefix || '';
+
+  const submit = (e) => {
+    e.preventDefault();
+    const clean = phone.replace(/\s/g, '').replace(/^0/, '');
+    const full = clean.startsWith('+') ? clean : `${prefix}${clean}`;
+    onSubmit({ provider, country, phoneNumber: full, amount: Math.round(parseFloat(amount) * 100) });
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <select value={country} onChange={e => setCountry(e.target.value)}
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+        {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+      </select>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '72px', height: '42px', borderRadius: '10px', border: `1.5px solid ${GOLD}`, backgroundColor: '#fffdf8', fontWeight: '800', color: '#b45309', fontSize: '13px' }}>
+          {prefix}
+        </div>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Numéro" required
+          style={{ flex: 1, height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </div>
+      <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Montant (XAF / USD)" min="1" step="any" required
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result && (
+        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace' }}>
+          {result.error ? `❌ ${result.error}` : result.message || result.status || 'Traitement en cours...'}
+        </div>
+      )}
+      <button type="submit" disabled={loading}
+        style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : color, color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Traitement...' : 'Envoyer'}
+      </button>
+    </form>
+  );
+}
+
+// Formulaire Virement Bancaire
+function BankTransferForm({ rail, onSubmit, loading, result }) {
+  const isSepa = rail === 'sepa';
+  const [name, setName] = useState('');
+  const [iban, setIban] = useState('');
+  const [bic, setBic] = useState('');
+  const [account, setAccount] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSubmit({
+      rail,
+      amount: Math.round(parseFloat(amount) * 100),
+      currency: isSepa ? 'EUR' : 'USD',
+      beneficiaryName: name,
+      iban: isSepa ? iban : undefined,
+      bic: isSepa ? bic : undefined,
+      accountNumber: !isSepa ? account : undefined,
+      dryRun: true,
+    });
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Nom du bénéficiaire" required
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {isSepa ? <>
+        <input type="text" value={iban} onChange={e => setIban(e.target.value)} placeholder="IBAN (ex: FR76...)" required
+          style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+        <input type="text" value={bic} onChange={e => setBic(e.target.value)} placeholder="BIC / SWIFT"
+          style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </> : <>
+        <input type="text" value={account} onChange={e => setAccount(e.target.value)} placeholder={rail === 'interac' ? 'Email ou numéro Interac' : 'Numéro de compte / SWIFT'}
+          style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </>}
+      <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Montant (${isSepa ? 'EUR' : 'CAD/USD'})`} min="1" step="any" required
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result && (
+        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace' }}>
+          {result.error ? `❌ ${result.error}` : JSON.stringify(result).substring(0, 150)}
+        </div>
+      )}
+      <button type="submit" disabled={loading}
+        style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : BLACK, color: GOLD, border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Traitement...' : 'Initier le virement'}
+      </button>
+    </form>
+  );
+}
+
+// Card générique
+function RailCard({ icon, label, desc, accentColor, children }) {
+  return (
+    <div style={{ border: '1.5px solid #e5e7eb', borderRadius: '16px', padding: '22px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: `3px solid ${accentColor || GOLD}` }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '20px' }}>{icon}</span>{label}
+      </h3>
+      <p style={{ margin: '0 0 4px', color: '#52525b', fontSize: '13px', lineHeight: '1.5' }}>{desc}</p>
+      {children}
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const [loadingRail, setLoadingRail] = useState(null);
+  const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
 
   React.useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.json())
+    fetch('/api/auth/me').then(r => r.json())
       .then(d => { if (!d.ok) window.location.href = '/auth/login'; })
       .catch(() => window.location.href = '/auth/login');
   }, []);
 
-  const trigger = async (rail) => {
-    setLoadingRail(rail.id);
-    setResults(r => ({ ...r, [rail.id]: null }));
+  const post = async (id, url, body) => {
+    setLoading(l => ({ ...l, [id]: true }));
+    setResults(r => ({ ...r, [id]: null }));
     try {
-      const res = await fetch(rail.route, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rail.body || { action: 'checkout', amount: 5000, currency: 'usd' }),
-      });
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.redirected) { window.location.href = res.url; return; }
       const data = await res.json().catch(() => null);
       if (data?.url) { window.location.href = data.url; return; }
       if (data?.checkoutUrl) { window.location.href = data.checkoutUrl; return; }
-      setResults(r => ({ ...r, [rail.id]: data }));
+      setResults(r => ({ ...r, [id]: data }));
     } catch (err) {
-      setResults(r => ({ ...r, [rail.id]: { error: err.message } }));
+      setResults(r => ({ ...r, [id]: { error: err.message } }));
     } finally {
-      setLoadingRail(null);
+      setLoading(l => ({ ...l, [id]: false }));
     }
   };
 
-  const card = (rail) => {
-    const loading = loadingRail === rail.id;
-    const result = results[rail.id];
-    return (
-      <div key={rail.id} style={{ border: '2px solid #e5e7eb', borderRadius: '16px', padding: '24px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
-        <div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '17px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '22px' }}>{rail.icon}</span> {rail.label}
-          </h3>
-          <p style={{ color: '#52525b', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{rail.desc}</p>
-        </div>
-        {result && (
-          <div style={{ padding: '10px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-            {result.error ? `❌ ${result.error}` : result.message || result.status || JSON.stringify(result).substring(0, 120)}
-          </div>
-        )}
-        <button
-          onClick={() => trigger(rail)}
-          disabled={!!loadingRail}
-          style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: loading ? '#6b7280' : rail.color, color: rail.textColor || '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loadingRail ? 'not-allowed' : 'pointer', opacity: loadingRail && !loading ? 0.5 : 1, transition: 'opacity 0.15s' }}
-        >
-          {loading ? '⏳ Traitement...' : `Payer avec ${rail.label}`}
-        </button>
-      </div>
-    );
-  };
+  const btnStyle = (color, textColor = '#fff') => ({
+    width: '100%', height: '46px', borderRadius: '10px', backgroundColor: color, color: textColor,
+    border: 'none', fontWeight: '800', fontSize: '14px', cursor: 'pointer', marginTop: '12px'
+  });
+
+  const resultBox = (id) => results[id] && (
+    <div style={{ padding: '8px 12px', borderRadius: '8px', marginTop: '10px', backgroundColor: results[id]?.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${results[id]?.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: results[id]?.error ? '#991b1b' : '#166534', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+      {results[id]?.error ? `❌ ${results[id].error}` : results[id]?.status || results[id]?.message || JSON.stringify(results[id]).substring(0, 150)}
+    </div>
+  );
+
+  const sectionTitle = (label) => (
+    <h2 style={{ fontSize: '13px', fontWeight: '800', color: '#09090b', marginBottom: '16px', paddingBottom: '10px', borderBottom: `2px solid ${GOLD}`, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      {label}
+    </h2>
+  );
 
   return (
     <>
       <Head><title>Enterprise Payment Rail · Smith-Heffa</title></Head>
-      <main style={{ minHeight: '100vh', backgroundColor: '#f4f4f5', color: '#111', fontFamily: 'system-ui, sans-serif', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <main style={{ minHeight: '100vh', backgroundColor: '#f4f4f4', color: '#111', fontFamily: 'system-ui, sans-serif', padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
+        {/* Badge env */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#eefbf4', border: '1px solid #c3e8d1', color: '#1b5e3a', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '800', letterSpacing: '0.05em', marginBottom: '24px', textTransform: 'uppercase' }}>
           <span style={{ width: '8px', height: '8px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 8px #10b981' }}></span>
           ENV : PRODUCTION SECURE · BUTTERTECH
         </div>
 
-        <div style={{ width: '100%', maxWidth: '1100px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px -15px rgba(0,0,0,0.1)' }}>
+        <div style={{ width: '100%', maxWidth: '1140px', backgroundColor: '#fff', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 60px -20px rgba(0,0,0,0.12)', border: '1px solid #e5e7eb' }}>
 
-          <section style={{ backgroundColor: '#09090b', color: '#fff', padding: '28px 32px', borderBottom: '4px solid #d4b26a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          {/* Header */}
+          <section style={{ backgroundColor: BLACK, color: '#fff', padding: '28px 32px', borderBottom: `4px solid ${GOLD}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h1 style={{ margin: '0 0 6px 0', fontSize: '26px', fontWeight: '800', letterSpacing: '-0.02em' }}>💳 Enterprise Payment Rail</h1>
-              <p style={{ margin: '0', color: '#a1a1aa', fontSize: '14px' }}>Console d'orchestration unifiée · {RAILS.length} rails disponibles</p>
+              <h1 style={{ margin: '0 0 6px', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>💳 Enterprise Payment Rail</h1>
+              <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>Console d'orchestration unifiée · 9 rails de paiement</p>
             </div>
-            <button
-              onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/auth/login'; }}
-              style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', border: '1px solid #3f3f46', cursor: 'pointer' }}
-            >
+            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/auth/login'; }}
+              style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', border: `1px solid #3f3f46`, cursor: 'pointer' }}>
               Déconnexion
             </button>
           </section>
 
           <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            {SECTIONS.map(section => (
-              <div key={section}>
-                <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#09090b', marginBottom: '16px', paddingBottom: '10px', borderBottom: '2px solid #f4f4f5', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {section === 'International' && '🌍 '}
-                  {section === 'Mobile Money Afrique' && '📱 '}
-                  {section === 'Virements Bancaires' && '🏦 '}
-                  {section}
-                </h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
-                  {RAILS.filter(r => r.section === section).map(card)}
-                </div>
+
+            {/* ─── INTERNATIONAL ─── */}
+            <div>
+              {sectionTitle('🌍 Paiements Internationaux')}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+                <RailCard icon="��" label="Stripe Checkout" desc="Cartes bancaires (Visa, Mastercard, Amex). Bac à sable Buttertech." accentColor="#635BFF">
+                  {resultBox('stripe')}
+                  <button onClick={() => post('stripe', '/api/applepay-checkout', { amount: 5000, currency: 'usd' })}
+                    disabled={loading.stripe} style={btnStyle('#635BFF')}>
+                    {loading.stripe ? '⏳...' : 'Payer avec Stripe'}
+                  </button>
+                </RailCard>
+
+                <RailCard icon="🍏" label="Apple Pay" desc="Paiement biométrique via l'écosystème Apple. Checkout Stripe Sandbox." accentColor="#000">
+                  {resultBox('applepay')}
+                  <button onClick={() => post('applepay', '/api/applepay-checkout', { amount: 5000, currency: 'usd' })}
+                    disabled={loading.applepay} style={btnStyle('#000')}>
+                    {loading.applepay ? '⏳...' : 'Payer avec Apple Pay'}
+                  </button>
+                </RailCard>
+
+                <RailCard icon="🅿️" label="PayPal" desc="Portefeuille électronique international. Fallback Stripe si PayPal indisponible." accentColor="#003087">
+                  {resultBox('paypal')}
+                  <button onClick={() => post('paypal', '/api/paypal-checkout', { amount: 5000, currency: 'usd' })}
+                    disabled={loading.paypal} style={btnStyle('#003087')}>
+                    {loading.paypal ? '⏳...' : 'Payer avec PayPal'}
+                  </button>
+                </RailCard>
+
               </div>
-            ))}
+            </div>
+
+            {/* ─── MOBILE MONEY AFRIQUE ─── */}
+            <div>
+              {sectionTitle('📱 Mobile Money Afrique')}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+                <RailCard icon="🟠" label="Orange Money" desc="CM · SN · CI · CD · BF · GN — Paiement par numéro Orange." accentColor="#FF6600">
+                  <MobileMoneyForm provider="orange" color="#FF6600"
+                    onSubmit={body => post('orange', '/api/mobile-money-payout', body)}
+                    loading={!!loading.orange} result={results.orange} />
+                </RailCard>
+
+                <RailCard icon="🟡" label="MTN MoMo" desc="CM · GH · UG · RW · ZM — Mobile Money MTN." accentColor="#FFC107">
+                  <MobileMoneyForm provider="mtn" color="#FFC107"
+                    onSubmit={body => post('mtn', '/api/mobile-money-payout', body)}
+                    loading={!!loading.mtn} result={results.mtn} />
+                </RailCard>
+
+                <RailCard icon="🟢" label="M-Pesa" desc="KE · TZ · MZ — Mobile Money Safaricom." accentColor="#00A550">
+                  <MobileMoneyForm provider="mpesa" color="#00A550"
+                    onSubmit={body => post('mpesa', '/api/mobile-money-payout', body)}
+                    loading={!!loading.mpesa} result={results.mpesa} />
+                </RailCard>
+
+              </div>
+            </div>
+
+            {/* ─── VIREMENTS BANCAIRES ─── */}
+            <div>
+              {sectionTitle('🏦 Virements Bancaires')}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+                <RailCard icon="🏦" label="SEPA Virement" desc="Zone Euro · Délai J+1 · IBAN requis · Mode simulation activé." accentColor="#1a56db">
+                  <BankTransferForm rail="sepa"
+                    onSubmit={body => post('sepa', '/api/bank-transfer-payout', body)}
+                    loading={!!loading.sepa} result={results.sepa} />
+                </RailCard>
+
+                <RailCard icon="🌐" label="SWIFT / Wire" desc="International · Multi-devises · Délai 1-3 jours · Mode simulation activé." accentColor="#374151">
+                  <BankTransferForm rail="swift"
+                    onSubmit={body => post('swift', '/api/bank-transfer-payout', body)}
+                    loading={!!loading.swift} result={results.swift} />
+                </RailCard>
+
+                <RailCard icon="🍁" label="Interac e-Transfer" desc="Canada uniquement · CAD · Instantané · Email ou numéro de téléphone." accentColor="#ef4444">
+                  <BankTransferForm rail="interac"
+                    onSubmit={body => post('interac', '/api/bank-transfer-payout', body)}
+                    loading={!!loading.interac} result={results.interac} />
+                </RailCard>
+
+              </div>
+            </div>
+
           </div>
 
-          <div style={{ backgroundColor: '#09090b', padding: '18px 32px', borderTop: '4px solid #d4b26a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Footer SecOps */}
+          <div style={{ backgroundColor: BLACK, padding: '18px 32px', borderTop: `4px solid ${GOLD}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '10px', fontWeight: '700', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Infrastructure certifiée par</span>
             <SecOps />
           </div>
+
         </div>
       </main>
     </>
