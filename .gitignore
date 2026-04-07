@@ -248,3 +248,5 @@ ModelManifest.xml
 .env.*
 !.env.example
 .env*.local
+.env.local
+*.zip
