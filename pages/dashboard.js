@@ -36,7 +36,7 @@ export default function Dashboard() {
               <h1 style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '800', letterSpacing: '-0.02em' }}>💳 Enterprise Payment Rail</h1>
               <p style={{ margin: '0', color: '#a1a1aa', fontSize: '15px' }}>Console d'orchestration unifiée. Sélectionnez un rail de paiement.</p>
             </div>
-            <a href="/api/auth/logout" style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', textDecoration: 'none', fontWeight: '700', fontSize: '14px', border: '1px solid #3f3f46' }}>Déconnexion</a>
+            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/auth/login'; }} style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', border: '1px solid #3f3f46', cursor: 'pointer' }}>Déconnexion</button>
           </section>
 
           <section style={{ padding: '32px' }}>
