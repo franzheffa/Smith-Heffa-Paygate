@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../../../lib/prisma';
+import { sha256, setSessionCookie, sessionExpiresAt, getClientIp } from '../../../lib/auth';
 
 function normalize(v) { return typeof v === 'string' ? v.trim() : ''; }
 
@@ -14,19 +15,6 @@ function wantsJson(req) {
   const xrw    = String(req.headers['x-requested-with'] || '').toLowerCase();
   const mode   = String((req.query && req.query.responseMode) || '').toLowerCase();
   return mode === 'json' || xrw === 'xmlhttprequest' || accept.includes('application/json');
-}
-
-function sha256(str) {
-  return crypto.createHash('sha256').update(str).digest('hex');
-}
-
-function setSessionCookie(res, token) {
-  const parts = [
-    `paygate_session=${encodeURIComponent(token)}`,
-    'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=1209600',
-  ];
-  if (process.env.NODE_ENV === 'production') parts.push('Secure');
-  res.setHeader('Set-Cookie', parts.join('; '));
 }
 
 function safeRedirect(target) {
@@ -77,20 +65,20 @@ export default async function handler(req, res) {
       return res.redirect(303, '/login-classic?error=invalid_credentials');
     }
 
-    // Créer une AuthSession persistante en base
+    // Token aléatoire + session en base avec bt_session (lib/auth standard)
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 jours
 
     await prisma.authSession.create({
       data: {
         accountId: authAccount.id,
         tokenHash: sha256(rawToken),
-        expiresAt,
-        userAgent:  req.headers['user-agent'] || null,
-        ipAddress:  req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null,
+        expiresAt: sessionExpiresAt(),
+        userAgent: req.headers['user-agent'] || null,
+        ipAddress: getClientIp(req) || null,
       },
     });
 
+    // Pose le cookie bt_session (même nom que lib/auth → compatible me.js + logout.js)
     setSessionCookie(res, rawToken);
 
     const user = authAccount.user;
