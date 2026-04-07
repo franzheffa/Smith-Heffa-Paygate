@@ -52,7 +52,8 @@ export default function LoginClassic() {
                 <button type="submit" style={{ flex: 1, height: '54px', borderRadius: '12px', backgroundColor: '#09090b', color: '#d4b26a', fontWeight: '800', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', cursor: 'pointer' }}>
                   Se Connecter
                 </button>
-                <a href="/auth/login" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100px', height: '54px', borderRadius: '12px', backgroundColor: '#fff', border: '2px solid #e5e7eb', color: '#111', fontWeight: '800', fontSize: '14px', textDecoration: 'none', boxSizing: 'border-box' }}>
+                <a href="/register" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "54px", padding: "0 20px", borderRadius: "12px", backgroundColor: "#fff", border: "2px solid #e5e7eb", color: "#111", fontWeight: "800", fontSize: "14px", textDecoration: "none", boxSizing: "border-box" }}>Créer un compte</a>
+                <a href="/auth/login" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100px", height: "54px", borderRadius: "12px", backgroundColor: "#fff", border: "2px solid #e5e7eb", color: "#111", fontWeight: "800", fontSize: "14px", textDecoration: "none", boxSizing: "border-box" }}>
                   Retour
                 </a>
               </div>
