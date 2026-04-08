@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "use": "sig",
+      "kty": "RSA",
+      "kid": "buttertech-smith-heffa-1775623547576",
+      "alg": "RS256",
+      "n": "tH04IQ0T_7biELzZlxINY7_Qn0HZ416npxIa4_bZhOgRPdGkJTzUKCeazmXlAFkBINIgcxPLTJo04AXUt39dF3Hv5UaeyN1ftMII1rkcu1iq9kbpp6mr8wtZliN2vl3QHLYIOs4JTSgeYbcMGvxVY-wtZWbKiDLKucT6zc97-LBa_TeqcD8TddRBTkIsde2Jfc3wIBx9Jfao2zlt4Vin2yOs-0K8nOuEyaHStRSCDk7l1VFmCLf-XbvoX_m_k337g2b7ONgZh085xuLODhS43OalG0_QEZ8ODy2vAejbdE9NeSk2JCbgTOXJMoE9yR7t1y7oeAoOWkbSho1ie5pNOQ",
+      "e": "AQAB"
+    }
+  ]
+}
