@@ -49,6 +49,11 @@ export default async function handler(req, res) {
     }
 
     const raw = randomToken(32);
+    // Nettoie les sessions orphelines avant d'en créer une nouvelle
+    await prisma.authSession.updateMany({
+      where: { accountId: account.id, expiresAt: { lt: new Date() } },
+      data: { revokedAt: new Date() }
+    });
     await prisma.authSession.create({
       data: {
         accountId: account.id,

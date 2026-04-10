@@ -68,6 +68,12 @@ export default async function handler(req, res) {
     // Token aléatoire + session en base avec bt_session (lib/auth standard)
     const rawToken = crypto.randomBytes(32).toString('hex');
 
+    // Révoque les vieilles sessions expirées pour ce compte (évite le blocage)
+    await prisma.authSession.updateMany({
+      where: { accountId: authAccount.id, expiresAt: { lt: new Date() } },
+      data: { revokedAt: new Date() }
+    });
+
     await prisma.authSession.create({
       data: {
         accountId: authAccount.id,
