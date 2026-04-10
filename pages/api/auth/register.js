@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const existingAccount = await prisma.authAccount.findUnique({ where: { email } });
-    if (existingAccount) return res.status(409).json({ error: 'Account already exists' });
+    if (existingAccount) return res.status(409).json({ error: 'Account already exists', loginUrl: '/login-classic', suggestion: 'Ce compte existe déjà. Connectez-vous.' });
 
     const passwordHash = await hashPassword(password);
     const existingUser = await prisma.user.findUnique({ where: { email } });
