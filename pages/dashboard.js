@@ -292,6 +292,9 @@ export default function Dashboard() {
                 </RailCard>
 
                 <RailCard icon="🍁" label="Interac e-Transfer" desc="Canada uniquement · CAD · Instantané · Email ou numéro de téléphone." accentColor="#ef4444">
+                  <div style={{marginBottom:'12px'}}>
+                    <InteracHubButton onVerified={(info) => console.log('Interac verified:', info)} />
+                  </div>
                   <BankTransferForm rail="interac"
                     onSubmit={body => post('interac', '/api/bank-transfer-payout', body)}
                     loading={!!loading.interac} result={results.interac} />
