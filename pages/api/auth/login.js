@@ -1,7 +1,11 @@
-import bcrypt from 'bcryptjs';
+/**
+ * POST /api/auth/login
+ * BUTTERTECH INC — Smith-Heffa-Paygate
+ * Authentification Enterprise Directory
+ */
 import crypto from 'crypto';
 import { prisma } from '../../../lib/prisma';
-import { sha256, setSessionCookie, sessionExpiresAt, getClientIp } from '../../../lib/auth';
+import { sha256, setSessionCookie, sessionExpiresAt, getClientIp, verifyPassword } from '../../../lib/auth';
 
 function normalize(v) { return typeof v === 'string' ? v.trim() : ''; }
 
@@ -59,16 +63,34 @@ export default async function handler(req, res) {
       return res.redirect(303, '/login-classic?error=invalid_credentials');
     }
 
-    const valid = await bcrypt.compare(password, authAccount.passwordHash);
+    // Supporte scrypt (nouveau) ET bcrypt (legacy si présent)
+    let valid = false;
+    const hash = authAccount.passwordHash;
+
+    if (hash.startsWith('scrypt$')) {
+      // Hash scrypt — méthode native lib/auth.js
+      valid = await verifyPassword(password, hash);
+    } else if (hash.startsWith('$2b$') || hash.startsWith('$2a$')) {
+      // Hash bcrypt legacy — compatibilité
+      try {
+        const bcrypt = await import('bcryptjs');
+        valid = await bcrypt.default.compare(password, hash);
+      } catch {
+        valid = false;
+      }
+    } else {
+      // Format inconnu
+      valid = false;
+    }
+
     if (!valid) {
       if (wantsJson(req)) return res.status(401).json({ ok: false, error: 'Identifiants invalides.' });
       return res.redirect(303, '/login-classic?error=invalid_credentials');
     }
 
-    // Token aléatoire + session en base avec bt_session (lib/auth standard)
     const rawToken = crypto.randomBytes(32).toString('hex');
 
-    // Révoque les vieilles sessions expirées pour ce compte (évite le blocage)
+    // Révoque les vieilles sessions expirées pour ce compte
     await prisma.authSession.updateMany({
       where: { accountId: authAccount.id, expiresAt: { lt: new Date() } },
       data: { revokedAt: new Date() }
@@ -84,7 +106,6 @@ export default async function handler(req, res) {
       },
     });
 
-    // Pose le cookie bt_session (même nom que lib/auth → compatible me.js + logout.js)
     setSessionCookie(res, rawToken);
 
     const user = authAccount.user;
