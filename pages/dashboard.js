@@ -147,6 +147,32 @@ function RailCard({ icon, label, desc, accentColor, children }) {
 }
 
 export default function Dashboard() {
+  const [interacUser, setInteracUser] = useState(null);
+  const [interacVerified, setInteracVerified] = useState(false);
+
+  // Gestion retour flow Interac Hub
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('interac_auth') === 'success') {
+      const info = {
+        given_name:  p.get('interac_given_name')  || '',
+        family_name: p.get('interac_family_name') || '',
+        email:       p.get('interac_email')       || '',
+      };
+      setInteracVerified(true);
+      setInteracUser(info);
+      window.history.replaceState({}, '', '/dashboard');
+      setTimeout(() => {
+        const el = document.getElementById('interac-transfer-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+    if (p.get('interac_error')) {
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, []);
+
   const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
 
