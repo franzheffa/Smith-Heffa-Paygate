@@ -213,7 +213,7 @@ export default async function handler(req, res) {
   const provider = String(req.body?.provider || '').toLowerCase();
   const amount = Number(req.body?.amount);
   const currency = String(req.body?.currency || 'XAF').toUpperCase();
-  const phone = String(req.body?.phone || '').trim();
+  const phone = String(req.body?.phone || req.body?.phoneNumber || '').trim();
   const country = String(req.body?.country || 'CM').toUpperCase();
   const reference = String(req.body?.reference || crypto.randomUUID());
   const operation = String(req.body?.operation || 'disbursement').toLowerCase();
