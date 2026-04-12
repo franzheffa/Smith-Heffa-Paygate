@@ -18,7 +18,9 @@ export default function handler(req, res) {
       openapi: '/openapi/smith-heffa-fdx-provider-v6.5.yaml',
       capability: '/api/fdx/v6/meta/capability',
       availability: '/api/fdx/v6/meta/availability',
-      certification_metrics: '/api/fdx/v6/meta/certification-metrics'
+      certification_metrics: '/api/fdx/v6/meta/certification-metrics',
+      accounts: '/api/fdx/v6/accounts',
+      audit_events: '/api/fdx/v6/audit/events'
     },
     note: 'Internal readiness metadata for Smith-Heffa-Paygate. This is not an official FDX certification artifact.'
   });

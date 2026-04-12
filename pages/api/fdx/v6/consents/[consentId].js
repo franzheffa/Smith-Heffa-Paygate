@@ -1,8 +1,10 @@
 import { prisma } from '../../../../../lib/prisma';
+import { recordAuditEvent } from '../../../../../lib/audit';
+import { getClientIp } from '../../../../../lib/auth';
 import { getAuthenticatedUser, getInteractionId, serializeConsent } from '../../../../../lib/fdx-api';
 
 export default async function handler(req, res) {
-  getInteractionId(req, res);
+  const requestId = getInteractionId(req, res);
 
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -23,6 +25,19 @@ export default async function handler(req, res) {
   if (consent.userId && consent.userId !== user.id) {
     return res.status(403).json({ code: '403', message: 'Forbidden' });
   }
+
+  await recordAuditEvent({
+    userId: user.id,
+    category: 'FDX_CONSENT',
+    action: 'getConsentGrant',
+    actorType: 'CUSTOMER',
+    resourceType: 'CONSENT',
+    resourceId: consent.id,
+    requestId,
+    ipAddress: getClientIp(req),
+    userAgent: req.headers['user-agent'],
+    payload: { status: consent.status }
+  });
 
   return res.status(200).json(serializeConsent(consent));
 }

@@ -12,6 +12,9 @@ servers:
 tags:
   - name: Meta
   - name: User Consent
+  - name: Account Information
+  - name: Account Transactions
+  - name: Audit
 paths:
   /meta/availability:
     get:
@@ -102,3 +105,43 @@ paths:
           description: Revoked
         '409':
           description: Already revoked
+  /accounts:
+    get:
+      operationId: searchForAccounts
+      tags: [Account Information]
+      responses:
+        '200':
+          description: List of FDX-style accounts for the authenticated user
+  /accounts/{accountId}:
+    get:
+      operationId: getAccount
+      tags: [Account Information]
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full account
+  /accounts/{accountId}/transactions:
+    get:
+      operationId: searchForAccountTransactions
+      tags: [Account Transactions]
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: FDX-style account transactions
+  /audit/events:
+    get:
+      operationId: getAuditEvents
+      tags: [Audit]
+      responses:
+        '200':
+          description: Signed audit events for the authenticated user

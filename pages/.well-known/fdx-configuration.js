@@ -26,6 +26,8 @@ export async function getServerSideProps({ res }) {
           capability: `${appUrl}/api/fdx/v6/meta/capability`,
           availability: `${appUrl}/api/fdx/v6/meta/availability`,
           certification_metrics: `${appUrl}/api/fdx/v6/meta/certification-metrics`,
+          accounts: `${appUrl}/api/fdx/v6/accounts`,
+          audit_events: `${appUrl}/api/fdx/v6/audit/events`,
           openapi: `${appUrl}/openapi/smith-heffa-fdx-provider-v6.5.yaml`,
           interac_init: `${appUrl}/api/interac/init`,
           interac_jwks: `${appUrl}/api/interac/jwks`,

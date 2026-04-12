@@ -37,7 +37,10 @@ export default function handler(req, res) {
       operation('getAvailability', `${base}/meta/availability`, 'GET'),
       operation('getCapability', `${base}/meta/capability`, 'GET'),
       operation('getCertificationMetrics', `${base}/meta/certification-metrics`, 'GET'),
-      operation('getConsentGrant', `${base}/consents/{consentId}`, 'GET', ['getConsentRevocation', 'revokeConsentGrant'])
+      operation('getConsentGrant', `${base}/consents/{consentId}`, 'GET', ['getConsentRevocation', 'revokeConsentGrant']),
+      operation('searchForAccounts', `${base}/accounts`, 'GET', ['getAccount', 'searchForAccountTransactions']),
+      operation('getAccount', `${base}/accounts/{accountId}`, 'GET'),
+      operation('searchForAccountTransactions', `${base}/accounts/{accountId}/transactions`, 'GET')
     ],
     jwksUrl: {
       href: `${appUrl()}/api/interac/jwks`,

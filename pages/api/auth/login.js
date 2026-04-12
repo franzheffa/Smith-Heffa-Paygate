@@ -6,6 +6,7 @@
 import crypto from 'crypto';
 import { prisma } from '../../../lib/prisma';
 import { sha256, setSessionCookie, sessionExpiresAt, getClientIp, verifyPassword } from '../../../lib/auth';
+import { recordAuditEvent } from '../../../lib/audit';
 
 function normalize(v) { return typeof v === 'string' ? v.trim() : ''; }
 
@@ -109,6 +110,18 @@ export default async function handler(req, res) {
     setSessionCookie(res, rawToken);
 
     const user = authAccount.user;
+    await recordAuditEvent({
+      userId: user.id,
+      category: 'AUTH',
+      action: 'login',
+      actorType: 'CUSTOMER',
+      resourceType: 'USER',
+      resourceId: user.id,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      payload: { email, redirectTo }
+    });
+
     if (wantsJson(req)) {
       return res.status(200).json({
         ok: true, redirectTo,

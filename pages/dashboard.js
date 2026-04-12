@@ -149,6 +149,12 @@ function RailCard({ icon, label, desc, accentColor, children }) {
 export default function Dashboard() {
   const [interacUser, setInteracUser] = useState(null);
   const [interacVerified, setInteracVerified] = useState(false);
+  const [sessionUser, setSessionUser] = useState(null);
+  const [fdxConsents, setFdxConsents] = useState([]);
+  const [fdxAccounts, setFdxAccounts] = useState([]);
+  const [fdxAuditEvents, setFdxAuditEvents] = useState([]);
+  const [fdxFeedback, setFdxFeedback] = useState(null);
+  const [fdxBusy, setFdxBusy] = useState(false);
 
   // Gestion retour flow Interac Hub
   React.useEffect(() => {
@@ -176,11 +182,88 @@ export default function Dashboard() {
   const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
 
-  React.useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json())
-      .then(d => { if (!d.ok) window.location.href = '/auth/login'; })
-      .catch(() => window.location.href = '/auth/login');
+  const loadFdxData = React.useCallback(async () => {
+    const [meRes, consentsRes, accountsRes, auditRes] = await Promise.all([
+      fetch('/api/auth/me'),
+      fetch('/api/fdx/v6/consents'),
+      fetch('/api/fdx/v6/accounts'),
+      fetch('/api/fdx/v6/audit/events')
+    ]);
+
+    const me = await meRes.json().catch(() => null);
+    if (!me?.ok) {
+      window.location.href = '/auth/login';
+      return;
+    }
+
+    const consents = await consentsRes.json().catch(() => ({ consents: [] }));
+    const accounts = await accountsRes.json().catch(() => ({ accounts: [] }));
+    const audit = await auditRes.json().catch(() => ({ events: [] }));
+
+    setSessionUser(me.user || null);
+    setFdxConsents(Array.isArray(consents.consents) ? consents.consents : []);
+    setFdxAccounts(Array.isArray(accounts.accounts) ? accounts.accounts : []);
+    setFdxAuditEvents(Array.isArray(audit.events) ? audit.events : []);
   }, []);
+
+  React.useEffect(() => {
+    loadFdxData().catch(() => {
+      window.location.href = '/auth/login';
+    });
+  }, [loadFdxData]);
+
+  const createDemoConsent = async () => {
+    setFdxBusy(true);
+    setFdxFeedback(null);
+    try {
+      const res = await fetch('/api/fdx/v6/consents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          durationType: 'TIME_BOUND',
+          durationPeriod: 180,
+          lookbackPeriod: 90,
+          resources: [
+            {
+              resourceType: 'ACCOUNT',
+              resourceId: fdxAccounts[0]?.accountId || 'acct-demo',
+              dataClusters: ['ACCOUNT_DETAILED', 'TRANSACTIONS']
+            }
+          ]
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || data?.error || 'Création du consentement impossible');
+      setFdxFeedback({ type: 'success', msg: `Consentement créé: ${data.id}` });
+      await loadFdxData();
+    } catch (error) {
+      setFdxFeedback({ type: 'error', msg: error.message });
+    } finally {
+      setFdxBusy(false);
+    }
+  };
+
+  const revokeConsent = async (consentId) => {
+    setFdxBusy(true);
+    setFdxFeedback(null);
+    try {
+      const res = await fetch(`/api/fdx/v6/consents/${consentId}/revocation`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'BUSINESS_RULE', initiator: 'DATA_ACCESS_PLATFORM' })
+      });
+      if (!res.ok && res.status !== 204) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || data?.error || 'Révocation impossible');
+      }
+      setFdxFeedback({ type: 'success', msg: `Consentement révoqué: ${consentId}` });
+      await loadFdxData();
+    } catch (error) {
+      setFdxFeedback({ type: 'error', msg: error.message });
+    } finally {
+      setFdxBusy(false);
+    }
+  };
 
   const post = async (id, url, body) => {
     setLoading(l => ({ ...l, [id]: true }));
@@ -335,6 +418,100 @@ export default function Dashboard() {
                     })}
                     loading={!!loading.interac} result={results.interac} />
                 </RailCard>
+
+              </div>
+            </div>
+
+            <div>
+              {sectionTitle('🛡️ FDX Control Center')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: '16px' }}>
+
+                <RailCard icon="📘" label="Consentements FDX" desc="Création, consultation et révocation des consentements provider alignés FDX v6.5." accentColor="#0f766e">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '12px', color: '#52525b' }}>
+                      Utilisateur: <strong>{sessionUser?.email || 'chargement...'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={loadFdxData} style={{ ...btnStyle('#18181b', '#fff'), width: 'auto', marginTop: 0, padding: '0 14px' }}>Rafraîchir</button>
+                      <button onClick={createDemoConsent} disabled={fdxBusy} style={{ ...btnStyle('#0f766e', '#fff'), width: 'auto', marginTop: 0, padding: '0 14px' }}>
+                        {fdxBusy ? '⏳...' : 'Créer un consentement'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {fdxFeedback && (
+                    <div style={{ padding: '10px 12px', borderRadius: '10px', backgroundColor: fdxFeedback.type === 'success' ? '#ecfdf5' : '#fef2f2', border: `1px solid ${fdxFeedback.type === 'success' ? '#bbf7d0' : '#fecaca'}`, color: fdxFeedback.type === 'success' ? '#166534' : '#991b1b', fontSize: '12px', fontWeight: '700', marginBottom: '10px' }}>
+                      {fdxFeedback.msg}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {fdxConsents.length === 0 && (
+                      <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: '#fafafa', border: '1px solid #e5e7eb', fontSize: '12px', color: '#52525b' }}>
+                        Aucun consentement FDX pour le moment.
+                      </div>
+                    )}
+                    {fdxConsents.map((consent) => (
+                      <div key={consent.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '12px', backgroundColor: '#fcfcfc' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
+                          <strong style={{ fontSize: '13px' }}>{consent.id}</strong>
+                          <span style={{ fontSize: '11px', fontWeight: '800', color: consent.status === 'ACTIVE' ? '#166534' : '#991b1b', backgroundColor: consent.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2', border: `1px solid ${consent.status === 'ACTIVE' ? '#bbf7d0' : '#fecaca'}`, borderRadius: '999px', padding: '4px 8px' }}>
+                            {consent.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#52525b', lineHeight: '1.6' }}>
+                          Durée: {consent.durationType} {consent.durationPeriod ? `· ${consent.durationPeriod} jours` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#52525b', lineHeight: '1.6' }}>
+                          Clusters: {(consent.resources || []).flatMap((resource) => resource.dataClusters || []).join(', ') || 'N/A'}
+                        </div>
+                        {consent.status === 'ACTIVE' && (
+                          <button onClick={() => revokeConsent(consent.id)} disabled={fdxBusy} style={{ ...btnStyle('#991b1b', '#fff'), width: 'auto', marginTop: '10px', padding: '0 14px' }}>
+                            Révoquer
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </RailCard>
+
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <RailCard icon="🏦" label="Comptes FDX" desc="Sous-ensemble provider FDX branché sur le ledger utilisateur et les transactions existantes." accentColor="#1d4ed8">
+                    {fdxAccounts.length === 0 ? (
+                      <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: '#fafafa', border: '1px solid #e5e7eb', fontSize: '12px', color: '#52525b' }}>
+                        Aucun compte exposé.
+                      </div>
+                    ) : fdxAccounts.map((account) => (
+                      <div key={account.accountId} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '12px', backgroundColor: '#fcfcfc', fontSize: '12px', color: '#27272a', lineHeight: '1.7' }}>
+                        <div><strong>{account.nickname}</strong></div>
+                        <div>Account ID: {account.accountId}</div>
+                        <div>Display: {account.accountNumberDisplay}</div>
+                        <div>Balance: {account.currentBalance} USD</div>
+                      </div>
+                    ))}
+                  </RailCard>
+
+                  <RailCard icon="🧾" label="Audit Trail Signé" desc="Événements de conformité récents avec signature HMAC côté serveur." accentColor="#7c3aed">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflow: 'auto' }}>
+                      {fdxAuditEvents.length === 0 && (
+                        <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: '#fafafa', border: '1px solid #e5e7eb', fontSize: '12px', color: '#52525b' }}>
+                          Aucun événement d'audit pour cette session.
+                        </div>
+                      )}
+                      {fdxAuditEvents.map((event) => (
+                        <div key={event.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '12px', backgroundColor: '#fcfcfc' }}>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: '#18181b' }}>{event.category} · {event.action}</div>
+                          <div style={{ fontSize: '11px', color: '#52525b', marginTop: '4px' }}>
+                            {event.resourceType}{event.resourceId ? ` · ${event.resourceId}` : ''} · {new Date(event.createdAt).toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#3f3f46', fontFamily: 'monospace', marginTop: '6px', wordBreak: 'break-all' }}>
+                            sig={event.signature || 'unsigned'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </RailCard>
+                </div>
 
               </div>
             </div>

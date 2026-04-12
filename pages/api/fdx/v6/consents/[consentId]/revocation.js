@@ -1,4 +1,6 @@
 import { prisma } from '../../../../../../lib/prisma';
+import { recordAuditEvent } from '../../../../../../lib/audit';
+import { getClientIp } from '../../../../../../lib/auth';
 import { getAuthenticatedUser, getInteractionId, serializeRevocation } from '../../../../../../lib/fdx-api';
 
 function normalize(value, fallback) {
@@ -6,7 +8,7 @@ function normalize(value, fallback) {
 }
 
 export default async function handler(req, res) {
-  getInteractionId(req, res);
+  const requestId = getInteractionId(req, res);
 
   const user = await getAuthenticatedUser(req);
   if (!user) {
@@ -27,6 +29,18 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    await recordAuditEvent({
+      userId: user.id,
+      category: 'FDX_CONSENT',
+      action: 'getConsentRevocation',
+      actorType: 'CUSTOMER',
+      resourceType: 'CONSENT',
+      resourceId: consent.id,
+      requestId,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      payload: { count: consent.revocations.length }
+    });
     return res.status(200).json({
       revocations: consent.revocations.map(serializeRevocation)
     });
@@ -55,6 +69,19 @@ export default async function handler(req, res) {
         }
       })
     ]);
+
+    await recordAuditEvent({
+      userId: user.id,
+      category: 'FDX_CONSENT',
+      action: 'revokeConsentGrant',
+      actorType: 'CUSTOMER',
+      resourceType: 'CONSENT',
+      resourceId: consent.id,
+      requestId,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      payload: { reason, initiator }
+    });
 
     return res.status(204).end();
   }

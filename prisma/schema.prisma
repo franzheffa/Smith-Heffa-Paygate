@@ -17,6 +17,7 @@ model User {
   messages      Message[]
   authAccount   AuthAccount?
   fdxConsents   FdxConsentGrant[]
+  auditEvents   FdxAuditEvent[]
   createdAt     DateTime      @default(now())
 }
 
@@ -98,4 +99,26 @@ model FdxConsentRevocation {
   updatedAt  DateTime        @updatedAt
 
   @@index([consentId])
+}
+
+model FdxAuditEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category    String
+  action      String
+  actorType   String
+  resourceType String
+  resourceId  String?
+  requestId   String?
+  ipAddress   String?
+  userAgent   String?
+  payload     Json
+  signature   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([category, action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
 }

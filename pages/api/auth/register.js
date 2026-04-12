@@ -1,5 +1,6 @@
 import { prisma } from '../../../lib/prisma';
 import { hashPassword, randomToken, sessionExpiresAt, setSessionCookie, sha256, getClientIp } from '../../../lib/auth';
+import { recordAuditEvent } from '../../../lib/audit';
 
 function sanitizeUser(user) {
   return { id: user.id, email: user.email, name: user.name || null, createdAt: user.createdAt };
@@ -64,6 +65,18 @@ export default async function handler(req, res) {
       }
     });
     setSessionCookie(res, raw);
+
+    await recordAuditEvent({
+      userId: account.user.id,
+      category: 'AUTH',
+      action: 'register',
+      actorType: 'CUSTOMER',
+      resourceType: 'USER',
+      resourceId: account.user.id,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      payload: { email }
+    });
 
     return res.status(201).json({ ok: true, user: sanitizeUser(account.user), security: { twoFactorEnabled: account.twoFactorEnabled } });
   } catch (error) {

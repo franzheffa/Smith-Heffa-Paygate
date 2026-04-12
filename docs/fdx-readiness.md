@@ -32,6 +32,10 @@ This document aligns the current deployment with the FDX onboarding material pro
 - `GET /api/fdx/v6/meta/availability`
 - `GET /api/fdx/v6/meta/capability`
 - `GET /api/fdx/v6/meta/certification-metrics`
+- `GET /api/fdx/v6/accounts`
+- `GET /api/fdx/v6/accounts/{accountId}`
+- `GET /api/fdx/v6/accounts/{accountId}/transactions`
+- `GET /api/fdx/v6/audit/events`
 - `GET|POST /api/fdx/v6/consents`
 - `GET /api/fdx/v6/consents/{consentId}`
 - `GET|PUT /api/fdx/v6/consents/{consentId}/revocation`
