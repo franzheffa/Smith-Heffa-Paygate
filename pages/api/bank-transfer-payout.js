@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
   const cfg = railConfig(rail);
   if (!cfg) {
-    return res.status(400).json({ error: 'Unsupported rail', allowed: ['swift', 'sepa'] });
+    return res.status(400).json({ error: 'Unsupported rail', allowed: ['swift', 'sepa', 'interac'] });
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {

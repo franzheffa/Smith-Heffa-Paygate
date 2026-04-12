@@ -1,34 +1,4 @@
-function boolEnv(name, fallback = false) {
-  const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
-  return ['1', 'true', 'yes', 'on', 'enabled'].includes(String(raw).toLowerCase());
-}
-
-function hasEnv(name) {
-  return Boolean(process.env[name] && String(process.env[name]).trim() !== '');
-}
-
-function railStatus() {
-  const stripe = hasEnv('STRIPE_SECRET_KEY');
-  const paypalEnabled = boolEnv('PAYPAL_ENABLED', false);
-  const applePayDomainReady = boolEnv('STRIPE_APPLE_PAY_DOMAIN_VERIFIED', false);
-  const mtnReady =
-    hasEnv('MTN_MOMO_API_USER_ID') &&
-    hasEnv('MTN_MOMO_API_KEY') &&
-    hasEnv('MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY');
-  const orangeReady =
-    hasEnv('ORANGE_CLIENT_ID') &&
-    hasEnv('ORANGE_CLIENT_SECRET') &&
-    hasEnv('ORANGE_API_KEY');
-
-  return {
-    stripe: stripe ? 'active' : 'missing_credentials',
-    paypal: stripe ? (paypalEnabled ? 'active' : 'card_fallback') : 'blocked',
-    apple_pay: stripe ? (applePayDomainReady ? 'active' : 'requires_domain_verification') : 'blocked',
-    mtn_momo: mtnReady ? 'sandbox_or_live_ready' : 'simulation',
-    orange_money: orangeReady ? 'sandbox_or_live_ready' : 'simulation'
-  };
-}
+const { boolEnv, fdxReadiness, hasEnv, railStatuses } = require('../../lib/fdx');
 
 export default function handler(req, res) {
   if (req.method !== 'GET') {
@@ -57,7 +27,15 @@ export default function handler(req, res) {
     system: 'Buttertech Platform Orchestrator',
     mode: process.env.NODE_ENV || 'development',
     modules,
-    rails: railStatus(),
-    security
+    rails: railStatuses(),
+    security,
+    compliance: {
+      fdx: {
+        participant_level: fdxReadiness().participant.level,
+        role: fdxReadiness().participant.role,
+        readiness_endpoint: '/api/fdx/readiness',
+        discovery_endpoint: '/.well-known/fdx-configuration'
+      }
+    }
   });
 }
