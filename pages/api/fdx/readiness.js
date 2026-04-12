@@ -14,6 +14,12 @@ export default function handler(req, res) {
     asOf: new Date().toISOString(),
     readiness,
     gaps,
+    endpoints: {
+      openapi: '/openapi/smith-heffa-fdx-provider-v6.5.yaml',
+      capability: '/api/fdx/v6/meta/capability',
+      availability: '/api/fdx/v6/meta/availability',
+      certification_metrics: '/api/fdx/v6/meta/certification-metrics'
+    },
     note: 'Internal readiness metadata for Smith-Heffa-Paygate. This is not an official FDX certification artifact.'
   });
 }

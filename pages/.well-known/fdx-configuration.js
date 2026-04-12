@@ -23,6 +23,10 @@ export async function getServerSideProps({ res }) {
           platform_status: `${appUrl}/api/platform-status`,
           auth_status: `${appUrl}/api/auth/status`,
           fdx_readiness: `${appUrl}/api/fdx/readiness`,
+          capability: `${appUrl}/api/fdx/v6/meta/capability`,
+          availability: `${appUrl}/api/fdx/v6/meta/availability`,
+          certification_metrics: `${appUrl}/api/fdx/v6/meta/certification-metrics`,
+          openapi: `${appUrl}/openapi/smith-heffa-fdx-provider-v6.5.yaml`,
           interac_init: `${appUrl}/api/interac/init`,
           interac_jwks: `${appUrl}/api/interac/jwks`,
           sepa_pain001: `${appUrl}/api/sepa/generate-pain001`

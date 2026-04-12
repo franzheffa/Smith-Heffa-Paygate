@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Smith-Heffa Paygate FDX Provider API
+  version: '6.5.0-shp1'
+  description: >
+    Smith-Heffa Paygate provider-facing FDX-aligned API surface.
+    This document implements a constrained subset of FDX-style meta and consent endpoints
+    for readiness, integration, and enterprise deployment workflows.
+servers:
+  - url: https://smith-heffa-paygate.vercel.app/api/fdx/v6
+    description: Production
+tags:
+  - name: Meta
+  - name: User Consent
+paths:
+  /meta/availability:
+    get:
+      operationId: getAvailability
+      tags: [Meta]
+      responses:
+        '200':
+          description: Availability response
+  /meta/capability:
+    get:
+      operationId: getCapability
+      tags: [Meta]
+      responses:
+        '200':
+          description: Capability response
+  /meta/certification-metrics:
+    get:
+      operationId: getCertificationMetrics
+      tags: [Meta]
+      responses:
+        '200':
+          description: Certification metrics response
+  /consents:
+    get:
+      operationId: listConsentGrants
+      tags: [User Consent]
+      responses:
+        '200':
+          description: Current authenticated user's consent grants
+    post:
+      operationId: createConsentGrant
+      tags: [User Consent]
+      responses:
+        '201':
+          description: Consent grant created
+  /consents/{consentId}:
+    get:
+      operationId: getConsentGrant
+      tags: [User Consent]
+      parameters:
+        - name: consentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consent grant
+        '401':
+          description: Authentication required
+        '404':
+          description: Consent grant not found
+  /consents/{consentId}/revocation:
+    get:
+      operationId: getConsentRevocation
+      tags: [User Consent]
+      parameters:
+        - name: consentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consent revocation history
+    put:
+      operationId: revokeConsentGrant
+      tags: [User Consent]
+      parameters:
+        - name: consentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                initiator:
+                  type: string
+      responses:
+        '204':
+          description: Revoked
+        '409':
+          description: Already revoked

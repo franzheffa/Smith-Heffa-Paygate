@@ -27,6 +27,14 @@ This document aligns the current deployment with the FDX onboarding material pro
   - Internal discovery metadata for provider readiness
 - `GET /api/fdx/readiness`
   - Machine-readable readiness report for operations, GitHub reviews, and Vercel smoke checks
+- `GET /openapi/smith-heffa-fdx-provider-v6.5.yaml`
+  - Local provider OpenAPI document aligned to the implemented FDX subset
+- `GET /api/fdx/v6/meta/availability`
+- `GET /api/fdx/v6/meta/capability`
+- `GET /api/fdx/v6/meta/certification-metrics`
+- `GET|POST /api/fdx/v6/consents`
+- `GET /api/fdx/v6/consents/{consentId}`
+- `GET|PUT /api/fdx/v6/consents/{consentId}/revocation`
 - `GET /api/platform-status`
   - Expanded rail visibility for Interac, SEPA, and SWIFT
 - Existing payment/identity endpoints remain unchanged
