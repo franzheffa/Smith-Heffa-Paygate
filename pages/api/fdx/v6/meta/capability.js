@@ -43,7 +43,7 @@ export default function handler(req, res) {
       operation('searchForAccountTransactions', `${base}/accounts/{accountId}/transactions`, 'GET')
     ],
     jwksUrl: {
-      href: `${appUrl()}/api/interac/jwks`,
+      href: `${appUrl()}/.well-known/jwks.json`,
       action: 'GET',
       types: ['application/json']
     }
