@@ -50,13 +50,103 @@ const PAWAPAY_COUNTRIES = [
   { code: 'ZMB', name: 'ZMB - Zambie', prefix: '+260', currency: 'ZMW' },
 ];
 
+const COUNTRY_2_TO_3 = {
+  BF: 'BFA',
+  CD: 'COD',
+  CI: 'CIV',
+  CM: 'CMR',
+  GH: 'GHA',
+  GN: 'GIN',
+  KE: 'KEN',
+  MZ: 'MOZ',
+  RW: 'RWA',
+  SN: 'SEN',
+  TZ: 'TZA',
+  UG: 'UGA',
+  ZM: 'ZMB',
+};
+
+function matchProviderForBrand(brand, provider = {}) {
+  const haystack = `${provider.displayName || ''} ${provider.provider || ''}`.toUpperCase();
+  if (brand === 'orange') return haystack.includes('ORANGE');
+  if (brand === 'mtn') return haystack.includes('MTN');
+  if (brand === 'mpesa') return haystack.includes('M-PESA') || haystack.includes('MPESA') || haystack.includes('SAFARICOM');
+  return false;
+}
+
+function InfoPills({ items }) {
+  if (!items?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {items.map((item) => (
+        <div key={item.label} style={{ fontSize: '11px', fontWeight: '800', borderRadius: '999px', padding: '5px 9px', backgroundColor: item.tone === 'danger' ? '#fef2f2' : item.tone === 'warn' ? '#fff7ed' : '#eff6ff', color: item.tone === 'danger' ? '#991b1b' : item.tone === 'warn' ? '#9a3412' : '#1d4ed8', border: `1px solid ${item.tone === 'danger' ? '#fecaca' : item.tone === 'warn' ? '#fed7aa' : '#bfdbfe'}` }}>
+          {item.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Formulaire Mobile Money
 function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
   const countries = MM_COUNTRIES[provider] || [];
   const [country, setCountry] = useState(countries[0]?.code || '');
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
+  const [operatorMeta, setOperatorMeta] = useState(null);
+  const [metaError, setMetaError] = useState('');
   const prefix = countries.find(c => c.code === country)?.prefix || '';
+
+  React.useEffect(() => {
+    let active = true;
+
+    const loadMeta = async () => {
+      const country3 = COUNTRY_2_TO_3[country];
+      if (!country3) {
+        if (active) {
+          setOperatorMeta(null);
+          setMetaError('');
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/pawapay/active-conf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: country3, operationType: 'PAYOUT' })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || 'Statut opérateur indisponible');
+
+        const countryConfig = Array.isArray(data?.countries)
+          ? data.countries.find((item) => item.country === country3)
+          : null;
+        const matched = (countryConfig?.providers || []).find((item) => matchProviderForBrand(provider, item));
+        const currencyConfig = matched?.currencies?.[0];
+        const opConfig = currencyConfig?.operationTypes?.PAYOUT;
+
+        if (!active) return;
+
+        setOperatorMeta(matched && opConfig ? {
+          providerCode: matched.provider,
+          displayName: matched.displayName,
+          currency: currencyConfig?.currency,
+          minAmount: opConfig.minAmount,
+          maxAmount: opConfig.maxAmount,
+          status: opConfig.status || 'UNKNOWN'
+        } : null);
+        setMetaError('');
+      } catch (error) {
+        if (!active) return;
+        setOperatorMeta(null);
+        setMetaError(error.message);
+      }
+    };
+
+    loadMeta();
+    return () => { active = false; };
+  }, [country, provider]);
 
   const submit = (e) => {
     e.preventDefault();
@@ -67,6 +157,20 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        ...(operatorMeta?.status ? [{ label: `Statut ${operatorMeta.status}`, tone: operatorMeta.status === 'OPERATIONAL' ? 'info' : operatorMeta.status === 'DELAYED' ? 'warn' : 'danger' }] : []),
+        ...(operatorMeta?.minAmount && operatorMeta?.maxAmount ? [{ label: `Limites ${operatorMeta.minAmount}-${operatorMeta.maxAmount} ${operatorMeta.currency || ''}`, tone: 'info' }] : [])
+      ]} />
+      {operatorMeta?.providerCode && (
+        <div style={{ fontSize: '12px', color: '#52525b' }}>
+          Réseau détecté: <strong>{operatorMeta.displayName}</strong> · <span style={{ fontFamily: 'monospace' }}>{operatorMeta.providerCode}</span>
+        </div>
+      )}
+      {metaError && (
+        <div style={{ fontSize: '12px', color: '#991b1b' }}>
+          {metaError}
+        </div>
+      )}
       <select value={country} onChange={e => setCountry(e.target.value)}
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
         {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
@@ -101,6 +205,8 @@ function PawaPayForm({ onSubmit, loading, result }) {
   const [provider, setProvider] = useState('');
   const [providers, setProviders] = useState([]);
   const [configError, setConfigError] = useState('');
+  const [predicting, setPredicting] = useState(false);
+  const [predictHint, setPredictHint] = useState('');
   const current = PAWAPAY_COUNTRIES.find((item) => item.code === country) || PAWAPAY_COUNTRIES[0];
   const operationType = operation === 'deposit' ? 'DEPOSIT' : 'PAYOUT';
 
@@ -165,6 +271,55 @@ function PawaPayForm({ onSubmit, loading, result }) {
     return () => { active = false; };
   }, [country, operationType, current.currency]);
 
+  React.useEffect(() => {
+    let active = true;
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 6 || providers.length === 0) {
+      setPredictHint('');
+      setPredicting(false);
+      return () => { active = false; };
+    }
+
+    const timer = setTimeout(async () => {
+      setPredicting(true);
+      try {
+        const phoneNumber = `${current.prefix.replace(/\D/g, '')}${digits.replace(/^0/, '')}`;
+        const res = await fetch('/api/pawapay/predict-provider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber })
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'Prédiction indisponible');
+        }
+
+        if (!active) return;
+
+        const predicted = providers.find((item) => item.code === data?.provider);
+        if (predicted) {
+          setProvider(predicted.code);
+          setPredictHint(`Provider prédit: ${predicted.label}`);
+        } else if (data?.provider) {
+          setPredictHint(`Provider prédit hors configuration: ${data.provider}`);
+        } else {
+          setPredictHint('');
+        }
+      } catch (error) {
+        if (!active) return;
+        setPredictHint(error.message);
+      } finally {
+        if (active) setPredicting(false);
+      }
+    }, 450);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [phone, providers, current.prefix]);
+
   const selectedProvider = providers.find((item) => item.code === provider);
   const displayMessage = result?.error
     ? result.error
@@ -187,6 +342,11 @@ function PawaPayForm({ onSubmit, loading, result }) {
 
   return (
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        ...(selectedProvider?.status ? [{ label: `Statut ${selectedProvider.status}`, tone: selectedProvider.status === 'OPERATIONAL' ? 'info' : selectedProvider.status === 'DELAYED' ? 'warn' : 'danger' }] : []),
+        ...(selectedProvider?.minAmount && selectedProvider?.maxAmount ? [{ label: `Limites ${selectedProvider.minAmount}-${selectedProvider.maxAmount} ${selectedProvider.currency || current.currency}`, tone: 'info' }] : []),
+        ...(predicting ? [{ label: 'Prédiction en cours', tone: 'warn' }] : [])
+      ]} />
       <select value={operation} onChange={e => setOperation(e.target.value)}
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
         <option value="payout">Payout</option>
@@ -218,6 +378,11 @@ function PawaPayForm({ onSubmit, loading, result }) {
       {selectedProvider?.minAmount && selectedProvider?.maxAmount && (
         <div style={{ fontSize: '12px', color: '#52525b' }}>
           Limites: {selectedProvider.minAmount} - {selectedProvider.maxAmount} {selectedProvider.currency || current.currency}
+        </div>
+      )}
+      {predictHint && (
+        <div style={{ fontSize: '12px', color: predictHint.includes('hors configuration') || predictHint.includes('indisponible') ? '#991b1b' : '#166534' }}>
+          {predictHint}
         </div>
       )}
       {configError && (
@@ -311,6 +476,7 @@ export default function Dashboard() {
   const [fdxAuditEvents, setFdxAuditEvents] = useState([]);
   const [fdxFeedback, setFdxFeedback] = useState(null);
   const [fdxBusy, setFdxBusy] = useState(false);
+  const [expertMode, setExpertMode] = useState(false);
 
   // Gestion retour flow Interac Hub
   React.useEffect(() => {
@@ -517,6 +683,18 @@ export default function Dashboard() {
             {/* ─── MOBILE MONEY AFRIQUE ─── */}
             <div>
               {sectionTitle('📱 Mobile Money Afrique')}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '13px', color: '#52525b' }}>
+                  pawaPay sert de rail principal. Les connexions directes restent disponibles en override.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpertMode((value) => !value)}
+                  style={{ height: '38px', borderRadius: '999px', padding: '0 14px', border: `1px solid ${expertMode ? '#c084fc' : '#d4d4d8'}`, backgroundColor: expertMode ? '#faf5ff' : '#fff', color: expertMode ? '#6b21a8' : '#27272a', fontWeight: '800', fontSize: '12px', cursor: 'pointer' }}
+                >
+                  {expertMode ? 'Mode expert activé' : 'Afficher les rails directs'}
+                </button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
 
                 <RailCard icon="🟣" label="Mobile Money pawaPay" desc="Rail agrégé Afrique. Sandbox prêt pour deposit, payout et callbacks dédiés." accentColor="#5B2ABF">
@@ -531,17 +709,21 @@ export default function Dashboard() {
                   />
                 </RailCard>
 
-                <RailCard icon="🟠" label="Orange Money" desc="CM · SN · CI · CD · BF · GN — Paiement par numéro Orange." accentColor="#FF6600">
-                  <MobileMoneyForm provider="orange" color="#FF6600"
-                    onSubmit={body => post('orange', '/api/mobile-money-payout', body)}
-                    loading={!!loading.orange} result={results.orange} />
-                </RailCard>
+                {expertMode && (
+                  <RailCard icon="🟠" label="Orange Money" desc="Rail direct expert. Override opérateur si tu ne veux pas passer par l’agrégation pawaPay." accentColor="#FF6600">
+                    <MobileMoneyForm provider="orange" color="#FF6600"
+                      onSubmit={body => post('orange', '/api/mobile-money-payout', body)}
+                      loading={!!loading.orange} result={results.orange} />
+                  </RailCard>
+                )}
 
-                <RailCard icon="🟡" label="MTN MoMo" desc="CM · GH · UG · RW · ZM — Mobile Money MTN." accentColor="#FFC107">
-                  <MobileMoneyForm provider="mtn" color="#FFC107"
-                    onSubmit={body => post('mtn', '/api/mobile-money-payout', body)}
-                    loading={!!loading.mtn} result={results.mtn} />
-                </RailCard>
+                {expertMode && (
+                  <RailCard icon="🟡" label="MTN MoMo" desc="Rail direct expert. Override MTN si nécessaire pour tests ciblés ou fallback." accentColor="#FFC107">
+                    <MobileMoneyForm provider="mtn" color="#FFC107"
+                      onSubmit={body => post('mtn', '/api/mobile-money-payout', body)}
+                      loading={!!loading.mtn} result={results.mtn} />
+                  </RailCard>
+                )}
 
                 <RailCard icon="🟢" label="M-Pesa" desc="KE · TZ · MZ — Mobile Money Safaricom." accentColor="#00A550">
                   <MobileMoneyForm provider="mpesa" color="#00A550"
