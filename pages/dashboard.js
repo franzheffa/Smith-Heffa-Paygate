@@ -137,6 +137,50 @@ function RailBadge({ label, imageUrl, tint = '#f4f4f5' }) {
   );
 }
 
+function buildStatusTimeline(item) {
+  const operation = String(item.operation || '').toUpperCase();
+  const history = Array.isArray(item.history) ? item.history : [];
+  const currentStatus = String(item.status || '').toUpperCase();
+  const isDeposit = operation === 'DEPOSIT';
+  const base = [
+    { key: 'INITIATED', label: 'Demande créée' },
+    { key: 'ACCEPTED', label: 'Acceptée' },
+    { key: isDeposit ? 'CUSTOMER_ACTION' : 'PROCESSING', label: isDeposit ? 'Action client / PIN / USSD' : 'Traitement opérateur' },
+    { key: 'COMPLETED', label: 'Finalisée' }
+  ];
+
+  const statusMap = {
+    INITIATED: 0,
+    ACCEPTED: 1,
+    DUPLICATE_IGNORED: 1,
+    PROCESSING: 2,
+    ENQUEUED: 2,
+    IN_RECONCILIATION: 2,
+    DELAYED: 2,
+    COMPLETED: 3,
+    FAILED: 3,
+    REJECTED: 3,
+    OTP_REQUIRED: 2
+  };
+
+  const currentIndex = statusMap[currentStatus] ?? 0;
+  return base.map((step, index) => {
+    const matchedHistory = history.find((entry) => {
+      const status = String(entry.status || '').toUpperCase();
+      if (step.key === 'CUSTOMER_ACTION') return ['PROCESSING', 'OTP_REQUIRED', 'ENQUEUED', 'IN_RECONCILIATION'].includes(status);
+      return status === step.key;
+    });
+    const isFinalFailure = index === 3 && ['FAILED', 'REJECTED'].includes(currentStatus);
+    return {
+      ...step,
+      done: index < currentIndex || (index === currentIndex && !isFinalFailure),
+      active: index === currentIndex,
+      failed: isFinalFailure,
+      at: matchedHistory?.at || ''
+    };
+  });
+}
+
 function TransactionTracker({ items }) {
   if (!items.length) return null;
   return (
@@ -158,12 +202,30 @@ function TransactionTracker({ items }) {
             </div>
           </div>
           <div style={{ display: 'grid', gap: '4px', fontSize: '12px', color: '#3f3f46' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              {item.countryLabel ? <RailBadge label={item.countryLabel} imageUrl={item.countryFlag} tint="#fafafa" /> : null}
+              {item.providerLabel ? <RailBadge label={item.providerLabel} imageUrl={item.providerLogo} tint="#fafafa" /> : null}
+            </div>
             <div>Pays: <strong>{item.country || 'N/A'}</strong></div>
             <div>Provider: <strong>{item.provider || 'N/A'}</strong></div>
             <div>Montant: <strong>{item.amount || 'N/A'} {item.currency || ''}</strong></div>
             <div>Rail choisi: <strong>{item.selectedRail || item.railLabel}</strong>{item.reason ? ` · ${item.reason}` : ''}</div>
             {item.externalId ? <div>ID externe: <span style={{ fontFamily: 'monospace' }}>{item.externalId}</span></div> : null}
             {item.message ? <div>Message: {item.message}</div> : null}
+          </div>
+          <div style={{ display: 'grid', gap: '8px', marginTop: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Timeline
+            </div>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {buildStatusTimeline(item).map((step) => (
+                <div key={`${item.id}-${step.key}`} style={{ display: 'grid', gridTemplateColumns: '18px 1fr auto', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ width: '14px', height: '14px', borderRadius: '999px', backgroundColor: step.failed ? '#ef4444' : step.done ? '#22c55e' : step.active ? '#f59e0b' : '#e4e4e7', border: `2px solid ${step.failed ? '#fecaca' : step.done ? '#bbf7d0' : step.active ? '#fed7aa' : '#d4d4d8'}` }} />
+                  <div style={{ fontSize: '12px', color: '#18181b', fontWeight: step.active ? '800' : '600' }}>{step.label}</div>
+                  <div style={{ fontSize: '11px', color: '#71717a' }}>{step.at ? new Date(step.at).toLocaleTimeString() : ''}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ))}
@@ -179,6 +241,11 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
   const [amount, setAmount] = useState('');
   const [operatorMeta, setOperatorMeta] = useState(null);
   const [metaError, setMetaError] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpFeedback, setOtpFeedback] = useState(null);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const prefix = countries.find(c => c.code === country)?.prefix || '';
 
   React.useEffect(() => {
@@ -215,6 +282,9 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
         setOperatorMeta(matched && opConfig ? {
           providerCode: matched.provider,
           displayName: matched.displayName,
+          logo: matched.logo || '',
+          countryFlag: countryConfig?.flag || '',
+          countryLabel: formatPawaPayCountryName(countryConfig),
           currency: currencyConfig?.currency,
           minAmount: opConfig.minAmount,
           maxAmount: opConfig.maxAmount,
@@ -232,11 +302,71 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
     return () => { active = false; };
   }, [country, provider]);
 
+  React.useEffect(() => {
+    setOtpCode('');
+    setOtpFeedback(null);
+    setOtpVerified(false);
+  }, [country, phone]);
+
+  const cleanPhone = phone.replace(/\s/g, '').replace(/^0/, '');
+  const fullPhone = cleanPhone.startsWith('+') ? cleanPhone : `${prefix}${cleanPhone}`;
+
+  const sendOrangeOtp = async () => {
+    if (provider !== 'orange' || !cleanPhone) {
+      setOtpFeedback({ type: 'error', msg: 'Saisissez le numéro Orange avant de demander le code.' });
+      return;
+    }
+    setOtpSending(true);
+    setOtpFeedback(null);
+    try {
+      const res = await fetch('/api/paygate/orange/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country, phoneNumber: fullPhone })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || 'Envoi OTP impossible');
+      setOtpVerified(false);
+      setOtpFeedback({
+        type: 'success',
+        msg: data?.message || 'Code OTP Orange envoyé. Entrez-le dans le champ ci-dessous.'
+      });
+    } catch (error) {
+      setOtpFeedback({ type: 'error', msg: error.message });
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyOrangeOtp = async () => {
+    if (provider !== 'orange') return;
+    setOtpVerifying(true);
+    setOtpFeedback(null);
+    try {
+      const res = await fetch('/api/paygate/orange/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country, phoneNumber: fullPhone, otp: otpCode })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || 'OTP invalide');
+      setOtpVerified(true);
+      setOtpFeedback({ type: 'success', msg: data?.message || 'OTP Orange vérifié.' });
+    } catch (error) {
+      setOtpVerified(false);
+      setOtpFeedback({ type: 'error', msg: error.message });
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
-    const clean = phone.replace(/\s/g, '').replace(/^0/, '');
-    const full = clean.startsWith('+') ? clean : `${prefix}${clean}`;
-    const response = await onSubmit({ provider, country, phoneNumber: full, amount: Math.round(parseFloat(amount) * 100) });
+    if (provider === 'orange' && !otpVerified) {
+      setOtpFeedback({ type: 'error', msg: 'Validez d’abord le code OTP reçu par SMS pour Orange Money.' });
+      return;
+    }
+    const response = await onSubmit({ provider, country, phoneNumber: fullPhone, amount: Math.round(parseFloat(amount) * 100), otpVerified });
     const status = response?.status || response?.message || (response?.error ? 'FAILED' : 'ACCEPTED');
     onTracked?.({
       railLabel: provider === 'orange' ? 'Orange Money Direct' : provider === 'mtn' ? 'MTN MoMo Direct' : 'M-Pesa Direct',
@@ -244,6 +374,10 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
       operation: 'PAYOUT',
       country,
       provider: operatorMeta?.providerCode || provider.toUpperCase(),
+      providerLabel: operatorMeta?.displayName || provider.toUpperCase(),
+      providerLogo: operatorMeta?.logo || '',
+      countryLabel: operatorMeta?.countryLabel || countries.find((c) => c.code === country)?.name || country,
+      countryFlag: operatorMeta?.countryFlag || '',
       amount,
       currency: operatorMeta?.currency || '',
       status,
@@ -260,6 +394,10 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
         ...(operatorMeta?.status ? [{ label: `Statut ${operatorMeta.status}`, tone: operatorMeta.status === 'OPERATIONAL' ? 'info' : operatorMeta.status === 'DELAYED' ? 'warn' : 'danger' }] : []),
         ...(operatorMeta?.minAmount && operatorMeta?.maxAmount ? [{ label: `Limites ${operatorMeta.minAmount}-${operatorMeta.maxAmount} ${operatorMeta.currency || ''}`, tone: 'info' }] : [])
       ]} />
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {operatorMeta?.countryLabel ? <RailBadge label={operatorMeta.countryLabel} imageUrl={operatorMeta.countryFlag} tint="#fafafa" /> : null}
+        {operatorMeta?.displayName ? <RailBadge label={operatorMeta.displayName} imageUrl={operatorMeta.logo} tint="#fafafa" /> : null}
+      </div>
       {operatorMeta?.providerCode && (
         <div style={{ fontSize: '12px', color: '#52525b' }}>
           Réseau détecté: <strong>{operatorMeta.displayName}</strong> · <span style={{ fontFamily: 'monospace' }}>{operatorMeta.providerCode}</span>
@@ -283,6 +421,33 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
       </div>
       <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Montant (XAF / USD)" min="1" step="any" required
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {provider === 'orange' && (
+        <div style={{ display: 'grid', gap: '8px', padding: '10px', borderRadius: '12px', border: '1px solid #fed7aa', backgroundColor: '#fff7ed' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#9a3412' }}>
+            OTP Orange Money
+          </div>
+          <div style={{ fontSize: '12px', color: '#7c2d12' }}>
+            Les utilisateurs reçoivent déjà un code par SMS. Il doit être saisi ici puis vérifié avant l’envoi Orange.
+          </div>
+          <button type="button" onClick={sendOrangeOtp} disabled={otpSending || !cleanPhone}
+            style={{ height: '40px', borderRadius: '10px', backgroundColor: '#fff', color: '#c2410c', border: '1px solid #fdba74', fontWeight: '800', fontSize: '13px', cursor: otpSending ? 'not-allowed' : 'pointer' }}>
+            {otpSending ? '⏳ Envoi OTP...' : 'Recevoir / renvoyer le code OTP'}
+          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+            <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Entrer le code reçu par SMS" inputMode="numeric"
+              style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #fdba74', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }} />
+            <button type="button" onClick={verifyOrangeOtp} disabled={otpVerifying || otpCode.length !== 6}
+              style={{ minWidth: '120px', height: '42px', borderRadius: '10px', backgroundColor: otpVerified ? '#16a34a' : '#ea580c', color: '#fff', border: 'none', fontWeight: '800', fontSize: '13px', cursor: otpVerifying ? 'not-allowed' : 'pointer' }}>
+              {otpVerifying ? '⏳...' : otpVerified ? 'OTP vérifié' : 'Vérifier le code'}
+            </button>
+          </div>
+          {otpFeedback && (
+            <div style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: otpFeedback.type === 'error' ? '#fef2f2' : '#f0fdf4', border: `1px solid ${otpFeedback.type === 'error' ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: otpFeedback.type === 'error' ? '#991b1b' : '#166534' }}>
+              {otpFeedback.msg}
+            </div>
+          )}
+        </div>
+      )}
       {result && (
         <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace' }}>
           {result.error ? `❌ ${result.error}` : result.message || result.status || 'Traitement en cours...'}
@@ -302,6 +467,10 @@ function PawaPayForm({ onTracked }) {
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [providerKey, setProviderKey] = useState('');
+  const [routingMode, setRoutingMode] = useState('auto');
+  const [routePreview, setRoutePreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const [configError, setConfigError] = useState('');
   const [predicting, setPredicting] = useState(false);
   const [predictHint, setPredictHint] = useState('');
@@ -473,6 +642,55 @@ function PawaPayForm({ onTracked }) {
   }, [providers, providerKey]);
 
   React.useEffect(() => {
+    if (!current || !selectedProvider || !amount || !phone.trim()) {
+      setRoutePreview(null);
+      setPreviewError('');
+      setPreviewLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      setPreviewError('');
+      try {
+        const clean = phone.replace(/\s/g, '').replace(/^0/, '');
+        const full = clean.startsWith('+') ? clean : `${current.prefix}${clean}`;
+        const res = await fetch('/api/mobile-money-router', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount,
+            country: current.code,
+            currency: selectedProvider.currency || current.defaultCurrency,
+            phoneNumber: full,
+            provider: selectedProvider.code,
+            operationType,
+            operation,
+            execute: false,
+            ...(routingMode !== 'auto' ? { forceRail: routingMode } : {})
+          })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || 'Prévisualisation indisponible');
+        if (!active) return;
+        setRoutePreview(data?.recommendation || null);
+      } catch (error) {
+        if (!active) return;
+        setRoutePreview(null);
+        setPreviewError(error.message);
+      } finally {
+        if (active) setPreviewLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [current, selectedProvider, amount, phone, operationType, operation, routingMode]);
+
+  React.useEffect(() => {
     if (!result) return undefined;
     const initial = getPawaPayFinalData(result);
     const resourceId = initial?.depositId || initial?.payoutId || '';
@@ -529,7 +747,11 @@ function PawaPayForm({ onTracked }) {
       selectedRail: result?.selectedRail || 'pawapay',
       operation: operationType,
       country: current.code,
+      countryLabel: formatPawaPayCountryName(current.countryConfig),
+      countryFlag: current.countryConfig?.flag || '',
       provider: selectedProvider.providerCode || '',
+      providerLabel: selectedProvider.displayName || selectedProvider.providerCode || '',
+      providerLogo: selectedProvider.logo || '',
       amount,
       currency: selectedProvider.currency || current.defaultCurrency || '',
       status: resultStatus || 'UNKNOWN',
@@ -566,7 +788,8 @@ function PawaPayForm({ onTracked }) {
           ...payload,
           operationType,
           operation,
-          execute: true
+          execute: true,
+          ...(routingMode !== 'auto' ? { forceRail: routingMode } : {})
         })
       });
       const data = await res.json().catch(() => null);
@@ -592,6 +815,12 @@ function PawaPayForm({ onTracked }) {
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
         <option value="payout">Payout</option>
         <option value="deposit">Deposit</option>
+      </select>
+      <select value={routingMode} onChange={e => setRoutingMode(e.target.value)}
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+        <option value="auto">Auto · choisir le meilleur rail</option>
+        <option value="pawapay">Forcer pawaPay</option>
+        {directFallbackRail && operation === 'payout' ? <option value={directFallbackRail}>Forcer {directFallbackRail.toUpperCase()} direct</option> : null}
       </select>
       <select value={country} onChange={e => setCountry(e.target.value)}
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
@@ -627,6 +856,28 @@ function PawaPayForm({ onTracked }) {
       {selectedProvider?.nameDisplayedToCustomer && operation === 'deposit' && (
         <div style={{ fontSize: '12px', color: '#52525b' }}>
           Nom affiché au client: <strong>{selectedProvider.nameDisplayedToCustomer}</strong>
+        </div>
+      )}
+      {(routePreview || previewLoading || previewError) && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #ddd6fe', backgroundColor: '#f5f3ff', display: 'grid', gap: '6px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '800', color: '#4c1d95' }}>
+            Mode Auto / résumé avant envoi
+          </div>
+          {previewLoading ? <div style={{ fontSize: '12px', color: '#6d28d9' }}>Analyse du rail en cours...</div> : null}
+          {previewError ? <div style={{ fontSize: '12px', color: '#991b1b' }}>{previewError}</div> : null}
+          {routePreview ? (
+            <>
+              <div style={{ fontSize: '12px', color: '#3f3f46' }}>
+                Rail choisi: <strong>{String(routePreview.selectedRail || 'pawapay').toUpperCase()}</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#3f3f46' }}>
+                Provider: <strong>{routePreview.provider || selectedProvider.providerCode}</strong> · Statut pawaPay: <strong>{routePreview.pawaPayStatus || selectedProvider.status || 'UNKNOWN'}</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#3f3f46' }}>
+                Motif: {routePreview.reason}
+              </div>
+            </>
+          ) : null}
         </div>
       )}
       {predictHint && (
@@ -777,10 +1028,21 @@ export default function Dashboard() {
     setTrackedTransactions((currentItems) => {
       const next = [...currentItems];
       const index = next.findIndex((item) => item.id === entry.id);
+      const historyEntry = {
+        status: entry.status || 'UNKNOWN',
+        at: entry.createdAt || new Date().toISOString(),
+        message: entry.message || ''
+      };
       if (index >= 0) {
-        next[index] = { ...next[index], ...entry };
+        const existing = next[index];
+        const existingHistory = Array.isArray(existing.history) ? existing.history : [];
+        const lastStatus = existingHistory[existingHistory.length - 1]?.status;
+        const history = lastStatus === historyEntry.status
+          ? existingHistory
+          : [...existingHistory, historyEntry];
+        next[index] = { ...existing, ...entry, history };
       } else {
-        next.unshift(entry);
+        next.unshift({ ...entry, history: [historyEntry] });
       }
       return next.slice(0, 12);
     });

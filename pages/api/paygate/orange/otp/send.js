@@ -1,3 +1,5 @@
+import { buildOrangeOtpChallenge, setOrangeOtpChallenge } from '../../../../../lib/orangeOtp';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
 
@@ -5,8 +7,16 @@ export default async function handler(req, res) {
     const { phoneNumber, country = 'CM' } = req.body || {};
     if (!phoneNumber) return res.status(400).json({ ok: false, error: 'Numéro requis' });
 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setOrangeOtpChallenge(res, buildOrangeOtpChallenge(phoneNumber, country, otp));
+
     if (process.env.PAYGATE_OTP_SIMULATION === 'true') {
-      return res.status(200).json({ ok: true, mode: 'simulation' });
+      return res.status(200).json({
+        ok: true,
+        mode: 'simulation',
+        message: 'Code OTP simulé et prêt à être vérifié',
+        otpPreview: process.env.NODE_ENV === 'production' ? undefined : otp
+      });
     }
 
     const clientId     = process.env.ORANGE_CLIENT_ID;
@@ -35,10 +45,7 @@ export default async function handler(req, res) {
 
     const { access_token } = await tokenRes.json();
 
-    // 2. OTP 6 chiffres
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // 3. Sender par défaut Orange : SMS 236082
+    // 2. Sender par défaut Orange : SMS 236082
     const senderAddress = 'tel:+236082';
 
     const smsBody = {
@@ -76,7 +83,7 @@ export default async function handler(req, res) {
     }
 
     console.log('[OTP] SMS envoyé à', phoneNumber, 'pays:', country);
-    return res.status(200).json({ ok: true, mode: 'live', message: 'Code OTP envoyé' });
+    return res.status(200).json({ ok: true, mode: 'live', message: 'Code OTP envoyé. Entrez-le dans le champ prévu pour valider Orange.' });
 
   } catch (error) {
     console.error('[OTP] Exception:', error.message);

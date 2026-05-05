@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isOrangeOtpVerified } from '../../lib/orangeOtp';
 
 function envValue(key, fallback = '') {
   return String(process.env[key] ?? fallback).trim();
@@ -277,6 +278,18 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (provider === 'orange') {
+      const otpCheck = isOrangeOtpVerified(req, { phoneNumber: phone, country });
+      if (!otpCheck.ok) {
+        return res.status(403).json({
+          error: otpCheck.error,
+          status: 'OTP_REQUIRED',
+          provider: 'ORANGE_MONEY',
+          nextStep: 'Send and verify Orange OTP before submitting the transaction.'
+        });
+      }
+    }
+
     if (provider === 'mtn') {
       const payerMessage = String(req.body?.payerMessage || 'MTN payout');
       const payeeNote = String(req.body?.payeeNote || 'MTN payout');

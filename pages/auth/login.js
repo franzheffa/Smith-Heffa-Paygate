@@ -14,6 +14,9 @@ export default function AuthLogin() {
   const [view, setView]       = useState('initial');
   const [country, setCountry] = useState('CM');
   const [phone, setPhone]     = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -33,12 +36,41 @@ export default function AuthLogin() {
       });
       const data = await res.json();
       if (data.ok) {
+        setOtpRequested(true);
+        setOtpVerified(false);
         setFeedback({ type: 'success', msg: `✅ Code de sécurité transmis au ${fullNumber}` });
       } else {
         setFeedback({ type: 'error', msg: `❌ Accès refusé : ${data.error || 'Échec réseau'}` });
       }
     } catch {
       setFeedback({ type: 'error', msg: '⚠️ Anomalie réseau détectée. Connexion instable.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpVerify = async () => {
+    setLoading(true);
+    setFeedback(null);
+    const prefix = COUNTRIES[country].prefix;
+    let clean = phone.replace(/\s+/g, '');
+    if (clean.startsWith('0')) clean = clean.substring(1);
+    const fullNumber = clean.startsWith('+') ? clean : `${prefix}${clean}`;
+    try {
+      const res = await fetch('/api/paygate/orange/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country, phoneNumber: fullNumber, otp: otpCode })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Code invalide');
+      }
+      setOtpVerified(true);
+      setFeedback({ type: 'success', msg: '✅ Code OTP vérifié. Le numéro est maintenant validé.' });
+    } catch (error) {
+      setOtpVerified(false);
+      setFeedback({ type: 'error', msg: `❌ ${error.message}` });
     } finally {
       setLoading(false);
     }
@@ -104,7 +136,7 @@ export default function AuthLogin() {
               <form onSubmit={handlePhoneSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontWeight: '700', fontSize: '14px', color: '#111' }}>🌐 Devise &amp; Pays d&apos;opération</label>
-                  <select value={country} onChange={(e) => { setCountry(e.target.value); setPhone(''); setFeedback(null); }} style={{ width: '100%', height: '54px', padding: '0 16px', borderRadius: '12px', border: '2px solid #e5e7eb', backgroundColor: '#fafafa', fontSize: '16px', fontWeight: '600', color: '#111', boxSizing: 'border-box', cursor: 'pointer' }}>
+                  <select value={country} onChange={(e) => { setCountry(e.target.value); setPhone(''); setOtpCode(''); setOtpRequested(false); setOtpVerified(false); setFeedback(null); }} style={{ width: '100%', height: '54px', padding: '0 16px', borderRadius: '12px', border: '2px solid #e5e7eb', backgroundColor: '#fafafa', fontSize: '16px', fontWeight: '600', color: '#111', boxSizing: 'border-box', cursor: 'pointer' }}>
                     {Object.entries(COUNTRIES).map(([code, data]) => (
                       <option key={code} value={code}>{data.name}</option>
                     ))}
@@ -120,6 +152,21 @@ export default function AuthLogin() {
                     <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={COUNTRIES[country].example} required style={{ flex: 1, height: '54px', padding: '0 16px', borderRadius: '12px', border: '2px solid #e5e7eb', fontSize: '16px', fontWeight: '600', color: '#111', boxSizing: 'border-box', outline: 'none' }} />
                   </div>
                 </div>
+
+                {otpRequested && (
+                  <div style={{ display: 'grid', gap: '10px', padding: '18px', borderRadius: '14px', border: '1px solid #fed7aa', backgroundColor: '#fff7ed' }}>
+                    <div style={{ fontWeight: '800', fontSize: '14px', color: '#9a3412' }}>Code reçu par SMS Orange</div>
+                    <div style={{ fontSize: '13px', color: '#7c2d12' }}>
+                      Entrez ici le code OTP reçu par la personne pour valider le numéro et finaliser la vérification.
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <input type="text" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Code à 6 chiffres" inputMode="numeric" style={{ flex: '1 1 200px', height: '54px', padding: '0 16px', borderRadius: '12px', border: '2px solid #fdba74', fontSize: '16px', fontWeight: '700', color: '#111', boxSizing: 'border-box', outline: 'none', backgroundColor: '#fff' }} />
+                      <button type="button" onClick={handleOtpVerify} disabled={loading || otpCode.length !== 6} style={{ minWidth: '150px', height: '54px', borderRadius: '12px', backgroundColor: otpVerified ? '#16a34a' : '#ea580c', color: '#fff', fontWeight: '800', fontSize: '14px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}>
+                        {loading ? '⏳ Vérification...' : otpVerified ? 'OTP vérifié' : 'Vérifier le code'}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {feedback && (
                   <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: feedback.type === 'success' ? '#eefbf4' : '#fef2f2', border: `1px solid ${feedback.type === 'success' ? '#c3e8d1' : '#fecaca'}`, color: feedback.type === 'success' ? '#1b5e3a' : '#991b1b', fontSize: '14px', fontWeight: '700' }}>

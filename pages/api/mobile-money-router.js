@@ -63,7 +63,8 @@ export default async function handler(req, res) {
   const amount = formatAmount(req.body?.amount);
   const phoneNumber = normalizePhoneNumber(req.body?.phoneNumber || req.body?.phone, req.body?.prefix);
   const execute = Boolean(req.body?.execute);
-  const forceRail = String(req.body?.forceRail || '').trim().toLowerCase();
+  const requestedRail = String(req.body?.forceRail || '').trim().toLowerCase();
+  const forceRail = requestedRail && requestedRail !== 'auto' ? requestedRail : '';
   let provider = String(req.body?.provider || '').trim().toUpperCase();
 
   if (!country) return res.status(400).json({ error: 'Missing country' });
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
   const matchedProvider = configuredProviders.find((item) => item.provider === provider) || configuredProviders[0] || null;
   const providerHealth = matchedProvider ? providerLooksOperational(matchedProvider, operationType, currency) : { opConfig: null, currency, status: 'UNKNOWN' };
 
-  const directRail = forceRail || mapProviderToDirectRail(provider || matchedProvider?.provider || '');
+  const directRail = mapProviderToDirectRail(provider || matchedProvider?.provider || '');
   const country2 = COUNTRY_3_TO_2[country] || '';
   const directSupported = directRail && DIRECT_COUNTRY_SUPPORT[directRail]?.has(country2);
 
@@ -103,9 +104,12 @@ export default async function handler(req, res) {
   } else if (providerHealth.status === 'CLOSED' && directSupported && operationType === 'PAYOUT') {
     selectedRail = directRail;
     reason = 'pawaPay provider closed; using direct payout fallback.';
-  } else if (forceRail && forceRail !== 'pawapay' && directSupported) {
+  } else if (forceRail && forceRail !== 'pawapay' && forceRail === directRail && directSupported) {
     selectedRail = forceRail;
     reason = 'Forced direct rail selected.';
+  } else if (forceRail === 'pawapay') {
+    selectedRail = 'pawapay';
+    reason = 'Forced pawaPay rail selected.';
   }
 
   const recommendation = {
