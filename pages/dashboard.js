@@ -99,7 +99,76 @@ function PawaPayForm({ onSubmit, loading, result }) {
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [provider, setProvider] = useState('');
+  const [providers, setProviders] = useState([]);
+  const [configError, setConfigError] = useState('');
   const current = PAWAPAY_COUNTRIES.find((item) => item.code === country) || PAWAPAY_COUNTRIES[0];
+  const operationType = operation === 'deposit' ? 'DEPOSIT' : 'PAYOUT';
+
+  React.useEffect(() => {
+    let active = true;
+
+    const loadProviders = async () => {
+      setConfigError('');
+      try {
+        const res = await fetch('/api/pawapay/active-conf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country, operationType })
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'Configuration pawaPay indisponible');
+        }
+
+        const countryConfig = Array.isArray(data?.countries)
+          ? data.countries.find((item) => item.country === country)
+          : null;
+
+        const nextProviders = (countryConfig?.providers || [])
+          .map((item) => {
+            const currencyConfig = Array.isArray(item?.currencies)
+              ? item.currencies.find((currencyItem) => currencyItem.currency === current.currency) || item.currencies[0]
+              : null;
+            const opConfig = currencyConfig?.operationTypes?.[operationType];
+            return {
+              code: item.provider,
+              label: `${item.displayName} · ${item.provider}`,
+              currency: currencyConfig?.currency || current.currency,
+              minAmount: opConfig?.minAmount || '',
+              maxAmount: opConfig?.maxAmount || '',
+              status: opConfig?.status || 'UNKNOWN'
+            };
+          })
+          .filter((item) => item.status === 'OPERATIONAL');
+
+        if (!active) return;
+
+        setProviders(nextProviders);
+        setProvider((prev) => {
+          if (nextProviders.some((item) => item.code === prev)) return prev;
+          return nextProviders[0]?.code || '';
+        });
+
+        if (!nextProviders.length) {
+          setConfigError(`Aucun provider ${operationType} disponible pour ${country}.`);
+        }
+      } catch (error) {
+        if (!active) return;
+        setProviders([]);
+        setProvider('');
+        setConfigError(error.message);
+      }
+    };
+
+    loadProviders();
+    return () => { active = false; };
+  }, [country, operationType, current.currency]);
+
+  const selectedProvider = providers.find((item) => item.code === provider);
+  const displayMessage = result?.error
+    ? result.error
+    : result?.failureReason?.failureMessage || result?.rejectionReason?.rejectionMessage || result?.message || result?.status || '';
 
   const submit = (e) => {
     e.preventDefault();
@@ -134,21 +203,34 @@ function PawaPayForm({ onSubmit, loading, result }) {
         <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Numéro mobile" required
           style={{ flex: 1, height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
       </div>
-      <input type="text" value={provider} onChange={e => setProvider(e.target.value.toUpperCase())} placeholder="Provider code pawaPay (ex: MTN_MOMO_RWA)" required
-        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <select value={provider} onChange={e => setProvider(e.target.value)} required
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+        <option value="" disabled>{configError ? 'Provider indisponible' : 'Choisir un provider'}</option>
+        {providers.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+      </select>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 92px', gap: '8px' }}>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Montant" min="1" step="any" required
           style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '42px', borderRadius: '10px', backgroundColor: '#f4f4f5', border: '1.5px solid #e5e7eb', fontWeight: '800', fontSize: '13px', color: '#27272a' }}>
-          {current.currency}
+          {selectedProvider?.currency || current.currency}
         </div>
       </div>
-      {result && (
-        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace', wordBreak: 'break-word' }}>
-          {result.error ? `❌ ${result.error}` : result.status || result.message || JSON.stringify(result).substring(0, 180)}
+      {selectedProvider?.minAmount && selectedProvider?.maxAmount && (
+        <div style={{ fontSize: '12px', color: '#52525b' }}>
+          Limites: {selectedProvider.minAmount} - {selectedProvider.maxAmount} {selectedProvider.currency || current.currency}
         </div>
       )}
-      <button type="submit" disabled={loading}
+      {configError && (
+        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', fontSize: '12px', color: '#991b1b', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+          {configError}
+        </div>
+      )}
+      {result && (
+        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error || result.status === 'REJECTED' ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error || result.status === 'REJECTED' ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error || result.status === 'REJECTED' ? '#991b1b' : '#166534', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+          {result.error || result.status === 'REJECTED' ? `❌ ${displayMessage}` : displayMessage || JSON.stringify(result).substring(0, 180)}
+        </div>
+      )}
+      <button type="submit" disabled={loading || !provider}
         style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#5B2ABF', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
         {loading ? '⏳ Traitement...' : 'Lancer via pawaPay'}
       </button>
