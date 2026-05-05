@@ -39,6 +39,17 @@ const MM_COUNTRIES = {
   ],
 };
 
+const PAWAPAY_COUNTRIES = [
+  { code: 'CMR', name: 'CMR - Cameroun', prefix: '+237', currency: 'XAF' },
+  { code: 'CIV', name: "CIV - Côte d'Ivoire", prefix: '+225', currency: 'XOF' },
+  { code: 'SEN', name: 'SEN - Sénégal', prefix: '+221', currency: 'XOF' },
+  { code: 'RWA', name: 'RWA - Rwanda', prefix: '+250', currency: 'RWF' },
+  { code: 'KEN', name: 'KEN - Kenya', prefix: '+254', currency: 'KES' },
+  { code: 'GHA', name: 'GHA - Ghana', prefix: '+233', currency: 'GHS' },
+  { code: 'UGA', name: 'UGA - Uganda', prefix: '+256', currency: 'UGX' },
+  { code: 'ZMB', name: 'ZMB - Zambie', prefix: '+260', currency: 'ZMW' },
+];
+
 // Formulaire Mobile Money
 function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
   const countries = MM_COUNTRIES[provider] || [];
@@ -77,6 +88,69 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
       <button type="submit" disabled={loading}
         style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : color, color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
         {loading ? '⏳ Traitement...' : 'Envoyer'}
+      </button>
+    </form>
+  );
+}
+
+function PawaPayForm({ onSubmit, loading, result }) {
+  const [country, setCountry] = useState(PAWAPAY_COUNTRIES[0]?.code || 'CMR');
+  const [operation, setOperation] = useState('payout');
+  const [phone, setPhone] = useState('');
+  const [amount, setAmount] = useState('');
+  const [provider, setProvider] = useState('');
+  const current = PAWAPAY_COUNTRIES.find((item) => item.code === country) || PAWAPAY_COUNTRIES[0];
+
+  const submit = (e) => {
+    e.preventDefault();
+    const clean = phone.replace(/\s/g, '').replace(/^0/, '');
+    const full = clean.startsWith('+') ? clean : `${current.prefix}${clean}`;
+    onSubmit({
+      amount,
+      country,
+      currency: current.currency,
+      phoneNumber: full,
+      provider,
+      customerMessage: 'Buttertech',
+      clientReferenceId: `SH-${Date.now()}`
+    }, operation);
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <select value={operation} onChange={e => setOperation(e.target.value)}
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+        <option value="payout">Payout</option>
+        <option value="deposit">Deposit</option>
+      </select>
+      <select value={country} onChange={e => setCountry(e.target.value)}
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+        {PAWAPAY_COUNTRIES.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+      </select>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '80px', height: '42px', borderRadius: '10px', border: `1.5px solid ${GOLD}`, backgroundColor: '#fffdf8', fontWeight: '800', color: '#b45309', fontSize: '13px' }}>
+          {current.prefix}
+        </div>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Numéro mobile" required
+          style={{ flex: 1, height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </div>
+      <input type="text" value={provider} onChange={e => setProvider(e.target.value.toUpperCase())} placeholder="Provider code pawaPay (ex: MTN_MOMO_RWA)" required
+        style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 92px', gap: '8px' }}>
+        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Montant" min="1" step="any" required
+          style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '42px', borderRadius: '10px', backgroundColor: '#f4f4f5', border: '1.5px solid #e5e7eb', fontWeight: '800', fontSize: '13px', color: '#27272a' }}>
+          {current.currency}
+        </div>
+      </div>
+      {result && (
+        <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: result.error ? '#fef2f2' : '#f0fdf4', border: `1px solid ${result.error ? '#fecaca' : '#bbf7d0'}`, fontSize: '12px', color: result.error ? '#991b1b' : '#166534', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+          {result.error ? `❌ ${result.error}` : result.status || result.message || JSON.stringify(result).substring(0, 180)}
+        </div>
+      )}
+      <button type="submit" disabled={loading}
+        style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#5B2ABF', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Traitement...' : 'Lancer via pawaPay'}
       </button>
     </form>
   );
@@ -362,6 +436,18 @@ export default function Dashboard() {
             <div>
               {sectionTitle('📱 Mobile Money Afrique')}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+
+                <RailCard icon="🟣" label="Mobile Money pawaPay" desc="Rail agrégé Afrique. Sandbox prêt pour deposit, payout et callbacks dédiés." accentColor="#5B2ABF">
+                  <PawaPayForm
+                    onSubmit={(body, operation) => post(
+                      'pawapay',
+                      operation === 'deposit' ? '/api/pawapay/deposits' : '/api/pawapay/payouts',
+                      body
+                    )}
+                    loading={!!loading.pawapay}
+                    result={results.pawapay}
+                  />
+                </RailCard>
 
                 <RailCard icon="🟠" label="Orange Money" desc="CM · SN · CI · CD · BF · GN — Paiement par numéro Orange." accentColor="#FF6600">
                   <MobileMoneyForm provider="orange" color="#FF6600"

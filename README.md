@@ -21,6 +21,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_replace_me
 NEXT_PUBLIC_APP_URL=https://smith-heffa-paygate.vercel.app
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?schema=public
 MOBILE_MONEY_API_KEY=replace_me
+PAWAPAY_API_BASE_URL=https://api.sandbox.pawapay.io
+PAWAPAY_API_TOKEN=replace_me
 ORANGE_MONEY_API_BASE_URL=https://api.orange-money.example
 ORANGE_MONEY_CLIENT_ID=replace_me
 ORANGE_MONEY_CLIENT_SECRET=replace_me
@@ -34,6 +36,17 @@ MTN_MOMO_COLLECTION_SUBSCRIPTION_KEY=replace_me
 MTN_MOMO_DISBURSEMENT_SUBSCRIPTION_KEY=replace_me
 INTERAC_API_BASE_URL=https://api.interac.example
 INTERAC_API_KEY=replace_me
+INTERAC_OIDC_WELL_KNOWN_URL=https://gateway-portal.hub-verify.innovation.interac.ca/.well-known/openid-configuration
+INTERAC_HUB_BASE_URL=https://gateway-portal.hub-verify.innovation.interac.ca
+INTERAC_CLIENT_ID=replace_me
+INTERAC_SCOPES=openid general_scope
+INTERAC_REDIRECT_URI=https://smith-heffa-paygate.vercel.app/api/interac/callback
+INTERAC_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+INTERAC_KID=replace_me
+INTERAC_PUBLIC_KEY_N=replace_me
+INTERAC_PUBLIC_KEY_E=AQAB
+INTERAC_UI_LOCALE=en-CA
+INTERAC_USE_PAR=false
 ORANGE_ORDERING_BASE_URL=https://api.orange.com/ordering/b2b/v3
 ORANGE_OAUTH_TOKEN_URL=https://api.orange.com/oauth/v3/token
 ORANGE_OIDC_TOKEN_URL=https://api.orange.com/oauth/v3/token
@@ -72,6 +85,8 @@ vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production
 vercel env add NEXT_PUBLIC_APP_URL production
 vercel env add DATABASE_URL production
 vercel env add MOBILE_MONEY_API_KEY production
+vercel env add PAWAPAY_API_BASE_URL production
+vercel env add PAWAPAY_API_TOKEN production
 vercel env add ORANGE_MONEY_API_BASE_URL production
 vercel env add ORANGE_MONEY_CLIENT_ID production
 vercel env add ORANGE_MONEY_CLIENT_SECRET production
@@ -96,6 +111,17 @@ vercel env add SEPA_API_KEY production
 vercel env add SEPA_PAYOUT_PATH production
 vercel env add INTERAC_API_BASE_URL production
 vercel env add INTERAC_API_KEY production
+vercel env add INTERAC_OIDC_WELL_KNOWN_URL production
+vercel env add INTERAC_HUB_BASE_URL production
+vercel env add INTERAC_CLIENT_ID production
+vercel env add INTERAC_SCOPES production
+vercel env add INTERAC_REDIRECT_URI production
+vercel env add INTERAC_PRIVATE_KEY_PEM production
+vercel env add INTERAC_KID production
+vercel env add INTERAC_PUBLIC_KEY_N production
+vercel env add INTERAC_PUBLIC_KEY_E production
+vercel env add INTERAC_UI_LOCALE production
+vercel env add INTERAC_USE_PAR production
 vercel env add ORANGE_ORDERING_BASE_URL production
 vercel env add ORANGE_OAUTH_TOKEN_URL production
 vercel env add ORANGE_OIDC_TOKEN_URL production
@@ -125,6 +151,19 @@ git add .
 git commit -m "chore: harden APIs and prepare production env/deploy"
 git push origin main
 ```
+
+## 5bis) pawaPay callbacks
+
+URLs à configurer dans le dashboard sandbox pawaPay:
+
+- Deposits: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/deposits`
+- Payouts: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/payouts`
+- Refunds: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/refunds`
+
+Quand le live sera ouvert, garde les mêmes paths et change seulement:
+
+- le token
+- `PAWAPAY_API_BASE_URL` vers `https://api.pawapay.io`
 
 ## 6) Passage en flux réel Interac -> Orange Money (important)
 
