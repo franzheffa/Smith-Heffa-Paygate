@@ -120,8 +120,59 @@ function getInstructionSet(opConfig) {
   }));
 }
 
+function mapPawaPayProviderToDirectRail(providerCode = '') {
+  const value = String(providerCode || '').toUpperCase();
+  if (value.includes('ORANGE')) return 'orange';
+  if (value.includes('MTN')) return 'mtn';
+  if (value.includes('M-PESA') || value.includes('MPESA') || value.includes('VODACOM')) return 'mpesa';
+  return '';
+}
+
+function RailBadge({ label, imageUrl, tint = '#f4f4f5' }) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '999px', padding: '6px 10px', border: '1px solid #e5e7eb', backgroundColor: tint }}>
+      {imageUrl ? <img src={imageUrl} alt={label} style={{ width: '18px', height: '18px', objectFit: 'contain', borderRadius: '999px', backgroundColor: '#fff' }} /> : null}
+      <span style={{ fontSize: '11px', fontWeight: '800', color: '#18181b' }}>{label}</span>
+    </div>
+  );
+}
+
+function TransactionTracker({ items }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gap: '12px' }}>
+      {items.map((item) => (
+        <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: '14px', padding: '14px', backgroundColor: '#fcfcfc' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: '14px', color: '#18181b' }}>{item.railLabel}</strong>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#52525b', backgroundColor: '#f4f4f5', borderRadius: '999px', padding: '4px 8px', border: '1px solid #e4e4e7' }}>
+                {item.operation}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: getPawaPayStatusTone(item.status) === 'danger' ? '#991b1b' : getPawaPayStatusTone(item.status) === 'warn' ? '#9a3412' : '#166534', backgroundColor: getPawaPayStatusTone(item.status) === 'danger' ? '#fef2f2' : getPawaPayStatusTone(item.status) === 'warn' ? '#fff7ed' : '#ecfdf5', borderRadius: '999px', padding: '4px 8px', border: `1px solid ${getPawaPayStatusTone(item.status) === 'danger' ? '#fecaca' : getPawaPayStatusTone(item.status) === 'warn' ? '#fed7aa' : '#bbf7d0'}` }}>
+                {item.status}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#71717a' }}>
+              {new Date(item.createdAt).toLocaleString()}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gap: '4px', fontSize: '12px', color: '#3f3f46' }}>
+            <div>Pays: <strong>{item.country || 'N/A'}</strong></div>
+            <div>Provider: <strong>{item.provider || 'N/A'}</strong></div>
+            <div>Montant: <strong>{item.amount || 'N/A'} {item.currency || ''}</strong></div>
+            <div>Rail choisi: <strong>{item.selectedRail || item.railLabel}</strong>{item.reason ? ` · ${item.reason}` : ''}</div>
+            {item.externalId ? <div>ID externe: <span style={{ fontFamily: 'monospace' }}>{item.externalId}</span></div> : null}
+            {item.message ? <div>Message: {item.message}</div> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Formulaire Mobile Money
-function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
+function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked }) {
   const countries = MM_COUNTRIES[provider] || [];
   const [country, setCountry] = useState(countries[0]?.code || '');
   const [phone, setPhone] = useState('');
@@ -181,11 +232,26 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
     return () => { active = false; };
   }, [country, provider]);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const clean = phone.replace(/\s/g, '').replace(/^0/, '');
     const full = clean.startsWith('+') ? clean : `${prefix}${clean}`;
-    onSubmit({ provider, country, phoneNumber: full, amount: Math.round(parseFloat(amount) * 100) });
+    const response = await onSubmit({ provider, country, phoneNumber: full, amount: Math.round(parseFloat(amount) * 100) });
+    const status = response?.status || response?.message || (response?.error ? 'FAILED' : 'ACCEPTED');
+    onTracked?.({
+      railLabel: provider === 'orange' ? 'Orange Money Direct' : provider === 'mtn' ? 'MTN MoMo Direct' : 'M-Pesa Direct',
+      selectedRail: provider,
+      operation: 'PAYOUT',
+      country,
+      provider: operatorMeta?.providerCode || provider.toUpperCase(),
+      amount,
+      currency: operatorMeta?.currency || '',
+      status,
+      externalId: response?.referenceId || response?.externalId || '',
+      message: response?.reason || response?.message || response?.error || '',
+      createdAt: new Date().toISOString(),
+      id: `${provider}-${Date.now()}`
+    });
   };
 
   return (
@@ -230,7 +296,7 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result }) {
   );
 }
 
-function PawaPayForm() {
+function PawaPayForm({ onTracked }) {
   const [country, setCountry] = useState('');
   const [operation, setOperation] = useState('payout');
   const [phone, setPhone] = useState('');
@@ -329,6 +395,7 @@ function PawaPayForm() {
               label: `${item.displayName} · ${item.provider}`,
               displayName: item.displayName,
               providerCode: item.provider,
+              logo: item.logo || '',
               currency: currencyConfig.currency,
               minAmount: opConfig.minAmount || '',
               maxAmount: opConfig.maxAmount || '',
@@ -452,6 +519,26 @@ function PawaPayForm() {
   const resultTone = finalData?.error || resultStatus === 'FAILED' || resultStatus === 'REJECTED' ? 'danger' : getPawaPayStatusTone(resultStatus);
   const instructionBlocks = operation === 'deposit' ? (selectedProvider?.instructions || []) : [];
   const shouldShowInstructions = operation === 'deposit' && selectedProvider && ['ACCEPTED', 'PROCESSING', 'COMPLETED'].includes(resultStatus || '');
+  const directFallbackRail = mapPawaPayProviderToDirectRail(selectedProvider?.providerCode || '');
+  const trackingId = finalData?.depositId || finalData?.payoutId || `${operationType}-${current?.code || 'N/A'}-${selectedProvider?.providerCode || 'N/A'}`;
+
+  React.useEffect(() => {
+    if (!result || !selectedProvider || !current) return;
+    onTracked?.({
+      railLabel: 'Mobile Money pawaPay',
+      selectedRail: result?.selectedRail || 'pawapay',
+      operation: operationType,
+      country: current.code,
+      provider: selectedProvider.providerCode || '',
+      amount,
+      currency: selectedProvider.currency || current.defaultCurrency || '',
+      status: resultStatus || 'UNKNOWN',
+      externalId: finalData?.depositId || finalData?.payoutId || finalData?.referenceId || '',
+      message: result?.reason || displayMessage,
+      createdAt: new Date().toISOString(),
+      id: trackingId
+    });
+  }, [result, selectedProvider, current, operationType, amount, resultStatus, finalData, displayMessage, onTracked, trackingId]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -472,13 +559,19 @@ function PawaPayForm() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(operation === 'deposit' ? '/api/pawapay/deposits' : '/api/pawapay/payouts', {
+      const res = await fetch('/api/mobile-money-router', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          operationType,
+          operation,
+          execute: true
+        })
       });
       const data = await res.json().catch(() => null);
       setResult(data || { error: 'Réponse vide pawaPay' });
+      const trackedData = getPawaPayFinalData(data || {});
     } catch (error) {
       setResult({ error: error.message });
     } finally {
@@ -491,6 +584,7 @@ function PawaPayForm() {
       <InfoPills items={[
         ...(selectedProvider?.status ? [{ label: `Statut ${selectedProvider.status}`, tone: getPawaPayStatusTone(selectedProvider.status) }] : []),
         ...(selectedProvider?.minAmount && selectedProvider?.maxAmount ? [{ label: `Limites ${selectedProvider.minAmount}-${selectedProvider.maxAmount} ${selectedProvider.currency || current?.defaultCurrency || ''}`, tone: 'info' }] : []),
+        ...(directFallbackRail && operation === 'payout' ? [{ label: `Fallback direct ${directFallbackRail.toUpperCase()}`, tone: 'warn' }] : []),
         ...(predicting ? [{ label: 'Prédiction en cours', tone: 'warn' }] : []),
         ...(configLoading ? [{ label: 'Chargement des marchés', tone: 'warn' }] : [])
       ]} />
@@ -519,6 +613,10 @@ function PawaPayForm() {
           </option>
         ))}
       </select>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {current?.countryConfig?.flag ? <RailBadge label={formatPawaPayCountryName(current.countryConfig)} imageUrl={current.countryConfig.flag} tint="#faf5ff" /> : null}
+        {selectedProvider?.displayName ? <RailBadge label={selectedProvider.displayName} imageUrl={selectedProvider.logo} tint="#f5f3ff" /> : null}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 92px', gap: '8px' }}>
         <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Montant" min="1" step="any" required
           style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
@@ -672,6 +770,21 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
+  const [trackedTransactions, setTrackedTransactions] = useState([]);
+
+  const pushTransaction = React.useCallback((entry) => {
+    if (!entry?.id) return;
+    setTrackedTransactions((currentItems) => {
+      const next = [...currentItems];
+      const index = next.findIndex((item) => item.id === entry.id);
+      if (index >= 0) {
+        next[index] = { ...next[index], ...entry };
+      } else {
+        next.unshift(entry);
+      }
+      return next.slice(0, 12);
+    });
+  }, []);
 
   const loadFdxData = React.useCallback(async () => {
     const [meRes, consentsRes, accountsRes, auditRes] = await Promise.all([
@@ -766,8 +879,11 @@ export default function Dashboard() {
       if (data?.url) { window.location.href = data.url; return; }
       if (data?.checkoutUrl) { window.location.href = data.checkoutUrl; return; }
       setResults(r => ({ ...r, [id]: data }));
+      return data;
     } catch (err) {
-      setResults(r => ({ ...r, [id]: { error: err.message } }));
+      const failure = { error: err.message };
+      setResults(r => ({ ...r, [id]: failure }));
+      return failure;
     } finally {
       setLoading(l => ({ ...l, [id]: false }));
     }
@@ -858,28 +974,36 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
 
                 <RailCard icon="🟣" label="Mobile Money pawaPay" desc="Rail agrégé Afrique. Sandbox prêt pour deposit, payout et callbacks dédiés." accentColor="#5B2ABF">
-                  <PawaPayForm />
+                  <PawaPayForm onTracked={pushTransaction} />
                 </RailCard>
 
                 <RailCard icon="🟠" label="Orange Money" desc="Rail direct Orange Money. Disponible au même niveau que le rail agrégé." accentColor="#FF6600">
                   <MobileMoneyForm provider="orange" color="#FF6600"
                     onSubmit={body => post('orange', '/api/mobile-money-payout', body)}
-                    loading={!!loading.orange} result={results.orange} />
+                    loading={!!loading.orange} result={results.orange} onTracked={pushTransaction} />
                 </RailCard>
 
                 <RailCard icon="🟡" label="MTN MoMo" desc="Rail direct MTN Mobile Money. Disponible pour fallback, tests ciblés et futur rail unitaire." accentColor="#FFC107">
                   <MobileMoneyForm provider="mtn" color="#FFC107"
                     onSubmit={body => post('mtn', '/api/mobile-money-payout', body)}
-                    loading={!!loading.mtn} result={results.mtn} />
+                    loading={!!loading.mtn} result={results.mtn} onTracked={pushTransaction} />
                 </RailCard>
 
                 <RailCard icon="🟢" label="M-Pesa" desc="KE · TZ · MZ — Mobile Money Safaricom." accentColor="#00A550">
                   <MobileMoneyForm provider="mpesa" color="#00A550"
                     onSubmit={body => post('mpesa', '/api/mobile-money-payout', body)}
-                    loading={!!loading.mpesa} result={results.mpesa} />
+                    loading={!!loading.mpesa} result={results.mpesa} onTracked={pushTransaction} />
                 </RailCard>
 
               </div>
+            </div>
+
+            <div>
+              {sectionTitle('🧭 Suivi Transactions')}
+              <div style={{ fontSize: '13px', color: '#52525b', marginBottom: '16px' }}>
+                Vue consolidée des transactions récentes, du rail choisi par le routeur, et de l’évolution de statut.
+              </div>
+              <TransactionTracker items={trackedTransactions} />
             </div>
 
             {/* ─── VIREMENTS BANCAIRES ─── */}
