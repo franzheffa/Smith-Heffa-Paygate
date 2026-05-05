@@ -26,14 +26,14 @@ const MM_COUNTRIES = {
     { code: 'GN', name: 'GN - Guinée', prefix: '+224' },
   ],
   mtn: [
-    { code: 'CM', name: '🇨�� Cameroun', prefix: '+237' },
+    { code: 'CM', name: 'CM - Cameroun', prefix: '+237' },
     { code: 'GH', name: 'GH - Ghana', prefix: '+233' },
     { code: 'UG', name: 'UG - Uganda', prefix: '+256' },
     { code: 'RW', name: 'RW - Rwanda', prefix: '+250' },
     { code: 'ZM', name: 'ZM - Zambie', prefix: '+260' },
   ],
   mpesa: [
-    { code: 'KE', name: '��🇪 Kenya', prefix: '+254' },
+    { code: 'KE', name: 'KE - Kenya', prefix: '+254' },
     { code: 'TZ', name: 'TZ - Tanzanie', prefix: '+255' },
     { code: 'MZ', name: 'MZ - Mozambique', prefix: '+258' },
   ],
@@ -433,11 +433,11 @@ function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked
             style={{ height: '40px', borderRadius: '10px', backgroundColor: '#fff', color: '#c2410c', border: '1px solid #fdba74', fontWeight: '800', fontSize: '13px', cursor: otpSending ? 'not-allowed' : 'pointer' }}>
             {otpSending ? '⏳ Envoi OTP...' : 'Recevoir / renvoyer le code OTP'}
           </button>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Entrer le code reçu par SMS" inputMode="numeric"
-              style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #fdba74', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }} />
+              style={{ flex: '1 1 180px', minWidth: 0, height: '42px', borderRadius: '10px', border: '1.5px solid #fdba74', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }} />
             <button type="button" onClick={verifyOrangeOtp} disabled={otpVerifying || otpCode.length !== 6}
-              style={{ minWidth: '120px', height: '42px', borderRadius: '10px', backgroundColor: otpVerified ? '#16a34a' : '#ea580c', color: '#fff', border: 'none', fontWeight: '800', fontSize: '13px', cursor: otpVerifying ? 'not-allowed' : 'pointer' }}>
+              style={{ flex: '0 0 auto', minWidth: '120px', height: '42px', borderRadius: '10px', backgroundColor: otpVerified ? '#16a34a' : '#ea580c', color: '#fff', border: 'none', fontWeight: '800', fontSize: '13px', cursor: otpVerifying ? 'not-allowed' : 'pointer' }}>
               {otpVerifying ? '⏳...' : otpVerified ? 'OTP vérifié' : 'Vérifier le code'}
             </button>
           </div>
@@ -743,7 +743,7 @@ function PawaPayForm({ onTracked }) {
   React.useEffect(() => {
     if (!result || !selectedProvider || !current) return;
     onTracked?.({
-      railLabel: 'Mobile Money pawaPay',
+      railLabel: 'Mobile Money PawaPay',
       selectedRail: result?.selectedRail || 'pawapay',
       operation: operationType,
       country: current.code,
@@ -819,7 +819,7 @@ function PawaPayForm({ onTracked }) {
       <select value={routingMode} onChange={e => setRoutingMode(e.target.value)}
         style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
         <option value="auto">Auto · choisir le meilleur rail</option>
-        <option value="pawapay">Forcer pawaPay</option>
+        <option value="pawapay">Forcer PawaPay</option>
         {directFallbackRail && operation === 'payout' ? <option value={directFallbackRail}>Forcer {directFallbackRail.toUpperCase()} direct</option> : null}
       </select>
       <select value={country} onChange={e => setCountry(e.target.value)}
@@ -871,7 +871,7 @@ function PawaPayForm({ onTracked }) {
                 Rail choisi: <strong>{String(routePreview.selectedRail || 'pawapay').toUpperCase()}</strong>
               </div>
               <div style={{ fontSize: '12px', color: '#3f3f46' }}>
-                Provider: <strong>{routePreview.provider || selectedProvider.providerCode}</strong> · Statut pawaPay: <strong>{routePreview.pawaPayStatus || selectedProvider.status || 'UNKNOWN'}</strong>
+                Provider: <strong>{routePreview.provider || selectedProvider.providerCode}</strong> · Statut PawaPay: <strong>{routePreview.pawaPayStatus || selectedProvider.status || 'UNKNOWN'}</strong>
               </div>
               <div style={{ fontSize: '12px', color: '#3f3f46' }}>
                 Motif: {routePreview.reason}
@@ -916,7 +916,7 @@ function PawaPayForm({ onTracked }) {
       )}
       <button type="submit" disabled={loading || !providerKey || configLoading}
         style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#5B2ABF', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
-        {loading ? '⏳ Traitement...' : 'Lancer via pawaPay'}
+        {loading ? '⏳ Traitement...' : 'Lancer via PawaPay'}
       </button>
     </form>
   );
@@ -983,6 +983,182 @@ function RailCard({ icon, label, desc, accentColor, children }) {
       <p style={{ margin: '0 0 4px', color: '#52525b', fontSize: '13px', lineHeight: '1.5' }}>{desc}</p>
       {children}
     </div>
+  );
+}
+
+function UniversalCheckoutForm({ onTracked }) {
+  const [form, setForm] = useState({
+    useCase: 'FLIGHT',
+    sourceCountry: 'CM',
+    sourceCurrency: 'XAF',
+    destinationCountry: 'FR',
+    destinationCurrency: 'EUR',
+    amountSource: '',
+    customerPhone: '',
+    customerEmail: '',
+    description: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/checkout/universal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          merchantId: 'smith-heffa-platform',
+          amountDestination: form.amountSource
+        })
+      });
+      const data = await res.json().catch(() => null);
+      setResult(data);
+      if (data?.ok) {
+        onTracked?.({
+          id: `universal-${data.checkoutId}`,
+          railLabel: 'Smith-Heffa Universal Checkout',
+          selectedRail: data?.route?.sourceRail || 'ROUTED',
+          operation: form.useCase,
+          country: form.sourceCountry,
+          countryLabel: `${form.sourceCountry} → ${form.destinationCountry}`,
+          provider: data?.route?.destinationRail || '',
+          providerLabel: data?.route?.sourceRail || '',
+          amount: form.amountSource,
+          currency: form.sourceCurrency,
+          status: data.status,
+          externalId: data.checkoutId,
+          message: data.message,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      setResult({ ok: false, error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        { label: 'Aucune donnée de paiement conservée', tone: 'info' },
+        { label: 'Confirmation forte obligatoire', tone: 'warn' }
+      ]} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+        <select value={form.useCase} onChange={(e) => update('useCase', e.target.value)} style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+          <option value="RIDE">Ride</option>
+          <option value="FLIGHT">Flight</option>
+          <option value="HOTEL">Hotel</option>
+          <option value="MERCHANT">Merchant</option>
+          <option value="TRANSFER">Transfer</option>
+          <option value="ACADEMY">Academy</option>
+        </select>
+        <input type="number" value={form.amountSource} onChange={(e) => update('amountSource', e.target.value)} placeholder="Montant" min="1" step="any" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+        <input type="text" value={form.sourceCountry} onChange={(e) => update('sourceCountry', e.target.value.toUpperCase())} placeholder="Pays source" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+        <input type="text" value={form.sourceCurrency} onChange={(e) => update('sourceCurrency', e.target.value.toUpperCase())} placeholder="Devise source" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+        <input type="text" value={form.destinationCountry} onChange={(e) => update('destinationCountry', e.target.value.toUpperCase())} placeholder="Pays destination" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+        <input type="text" value={form.destinationCurrency} onChange={(e) => update('destinationCurrency', e.target.value.toUpperCase())} placeholder="Devise destination" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      </div>
+      <input type="tel" value={form.customerPhone} onChange={(e) => update('customerPhone', e.target.value)} placeholder="Téléphone client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="email" value={form.customerEmail} onChange={(e) => update('customerEmail', e.target.value)} placeholder="Email client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="text" value={form.description} onChange={(e) => update('description', e.target.value)} placeholder="Description métier" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, backgroundColor: result.ok ? '#f0fdf4' : '#fef2f2', color: result.ok ? '#166534' : '#991b1b', fontSize: '12px', display: 'grid', gap: '4px' }}>
+          <div><strong>{result.ok ? 'Checkout routé' : 'Erreur checkout'}</strong></div>
+          <div>{result.message || result.error}</div>
+          {result.route ? <div>Source: <strong>{result.route.sourceRail}</strong> · Destination: <strong>{result.route.destinationRail}</strong></div> : null}
+          {result.nextAction ? <div>Étape suivante: {result.nextAction}</div> : null}
+        </div>
+      )}
+      <button type="submit" disabled={loading} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : BLACK, color: GOLD, border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Routage...' : 'Préparer le checkout Smith-Heffa'}
+      </button>
+    </form>
+  );
+}
+
+function VoiceHelperForm() {
+  const [transcript, setTranscript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const parseIntent = async (text) => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/voice/intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json().catch(() => null);
+      setResult(data);
+    } catch (error) {
+      setResult({ ok: false, error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startVoice = async () => {
+    if (typeof window === 'undefined') return;
+    const VoiceRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!VoiceRecognition) {
+      setResult({ ok: false, error: 'Reconnaissance vocale non disponible sur ce navigateur.' });
+      return;
+    }
+
+    const recognition = new VoiceRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.maxAlternatives = 1;
+    recognition.onresult = async (event) => {
+      const text = event.results?.[0]?.[0]?.transcript || '';
+      setTranscript(text);
+      await parseIntent(text);
+    };
+    recognition.onerror = () => {
+      setResult({ ok: false, error: 'La capture vocale a échoué. Utilisez le champ texte si besoin.' });
+    };
+    recognition.start();
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    await parseIntent(transcript);
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        { label: 'La voix guide seulement', tone: 'warn' },
+        { label: 'Aucune exécution automatique', tone: 'info' }
+      ]} />
+      <button type="button" onClick={startVoice} style={{ height: '42px', borderRadius: '10px', backgroundColor: '#111827', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>
+        🎙️ Parler à Smith-Heffa
+      </button>
+      <input type="text" value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder='Ex: "Paie mon Yango" ou "Billet avion Douala Paris"' style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, backgroundColor: result.ok ? '#f0fdf4' : '#fef2f2', color: result.ok ? '#166534' : '#991b1b', fontSize: '12px', display: 'grid', gap: '4px' }}>
+          <div><strong>{result.ok ? 'Intent détecté' : 'Erreur voice helper'}</strong></div>
+          {result.intent ? <div>Type: <strong>{result.intent.type}</strong> · Provider: <strong>{result.intent.provider}</strong></div> : null}
+          <div>{result.message || result.error}</div>
+        </div>
+      )}
+      <button type="submit" disabled={loading || !transcript.trim()} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#0f766e', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Analyse...' : 'Préparer une intention vocale'}
+      </button>
+    </form>
   );
 }
 
@@ -1200,7 +1376,7 @@ export default function Dashboard() {
               {sectionTitle('🌍 Paiements Internationaux')}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
 
-                <RailCard icon="��" label="Stripe Checkout" desc="Cartes bancaires (Visa, Mastercard, Amex). Bac à sable Buttertech." accentColor="#635BFF">
+                <RailCard icon="💳" label="Stripe Checkout" desc="Cartes bancaires (Visa, Mastercard, Amex). Bac à sable Buttertech." accentColor="#635BFF">
                   {resultBox('stripe')}
                   <button onClick={() => post('stripe', '/api/applepay-checkout', { amount: 5000, currency: 'usd' })}
                     disabled={loading.stripe} style={btnStyle('#635BFF')}>
@@ -1229,13 +1405,26 @@ export default function Dashboard() {
 
             {/* ─── MOBILE MONEY AFRIQUE ─── */}
             <div>
+              {sectionTitle('🧠 Smith-Heffa Universal Checkout')}
+              <div style={{ fontSize: '13px', color: '#52525b', marginBottom: '16px' }}>
+                Paiement local, règlement mondial. Smith-Heffa route l’intention sans exécuter de transaction avant confirmation forte.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <RailCard icon="🌐" label="Universal Checkout" desc="Routage cross-rail pour billets, trajets, marchands, Academy et transferts." accentColor="#111827">
+                  <UniversalCheckoutForm onTracked={pushTransaction} />
+                </RailCard>
+                <RailCard icon="🎙️" label="Voice Helper" desc="La voix prépare l’intention. Smith-Heffa n’exécute jamais un paiement par la voix seule." accentColor="#0f766e">
+                  <VoiceHelperForm />
+                </RailCard>
+              </div>
+
               {sectionTitle('📱 Mobile Money Afrique')}
               <div style={{ fontSize: '13px', color: '#52525b', marginBottom: '16px' }}>
-                pawaPay agrège les marchés Mobile Money activés sur ton compte, sans retirer tes rails directs Orange, MTN et M-Pesa.
+                PawaPay agrège les marchés Mobile Money activés sur ton compte. Les rails directs Orange, MTN et M-Pesa restent conservés comme couche de résilience opérateur.
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
 
-                <RailCard icon="🟣" label="Mobile Money pawaPay" desc="Rail agrégé Afrique. Sandbox prêt pour deposit, payout et callbacks dédiés." accentColor="#5B2ABF">
+                <RailCard icon="🟣" label="Mobile Money PawaPay" desc="Rail agrégé Afrique. Sandbox prêt pour deposit, payout et callbacks dédiés." accentColor="#5B2ABF">
                   <PawaPayForm onTracked={pushTransaction} />
                 </RailCard>
 
