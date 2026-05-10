@@ -4,6 +4,7 @@ import Head from 'next/head';
 
 const GOLD = '#C6A85B';
 const BLACK = '#09090b';
+const BRAZIL_FLAG = '/images/flags/br.svg';
 
 const SecOps = () => (
   <svg height="20" viewBox="0 0 340 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
@@ -77,8 +78,8 @@ function InfoPills({ items }) {
 }
 
 function getPawaPayStatusTone(status = '') {
-  if (status === 'COMPLETED' || status === 'ACCEPTED' || status === 'OPERATIONAL') return 'info';
-  if (status === 'PROCESSING' || status === 'ENQUEUED' || status === 'DELAYED' || status === 'IN_RECONCILIATION') return 'warn';
+  if (status === 'COMPLETED' || status === 'ACCEPTED' || status === 'OPERATIONAL' || status === 'SUCCEEDED' || status === 'PAID') return 'info';
+  if (status === 'PROCESSING' || status === 'ENQUEUED' || status === 'DELAYED' || status === 'IN_RECONCILIATION' || status === 'REQUIRES_ACTION' || status === 'REQUIRES_CONFIRMATION') return 'warn';
   return 'danger';
 }
 
@@ -154,12 +155,18 @@ function buildStatusTimeline(item) {
     ACCEPTED: 1,
     DUPLICATE_IGNORED: 1,
     PROCESSING: 2,
+    REQUIRES_ACTION: 2,
+    REQUIRES_CONFIRMATION: 2,
     ENQUEUED: 2,
     IN_RECONCILIATION: 2,
     DELAYED: 2,
     COMPLETED: 3,
+    SUCCEEDED: 3,
     FAILED: 3,
     REJECTED: 3,
+    EXPIRED: 3,
+    CANCELED: 3,
+    REQUIRES_PAYMENT_METHOD: 3,
     OTP_REQUIRED: 2
   };
 
@@ -793,7 +800,7 @@ function PawaPayForm({ onTracked }) {
         })
       });
       const data = await res.json().catch(() => null);
-      setResult(data || { error: 'Réponse vide pawaPay' });
+      setResult(data || { error: 'Réponse vide PawaPay' });
       const trackedData = getPawaPayFinalData(data || {});
     } catch (error) {
       setResult({ error: error.message });
@@ -968,6 +975,166 @@ function BankTransferForm({ rail, onSubmit, loading, result }) {
       <button type="submit" disabled={loading}
         style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : BLACK, color: GOLD, border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
         {loading ? '⏳ Traitement...' : 'Initier le virement'}
+      </button>
+    </form>
+  );
+}
+
+function PixForm({ onTracked }) {
+  const [amount, setAmount] = useState('');
+  const [email, setEmail] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [result, setResult] = useState(null);
+
+  React.useEffect(() => {
+    if (!result?.providerIntentId) return;
+    onTracked?.({
+      id: `ledger-${result.providerIntentId}`,
+      railLabel: 'Pix Brasil',
+      selectedRail: 'PIX_BR',
+      operation: 'PAYMENT',
+      country: 'BR',
+      countryLabel: 'BR - Brésil',
+      countryFlag: BRAZIL_FLAG,
+      provider: 'stripe',
+      providerLabel: 'Stripe Pix',
+      amount,
+      currency: 'BRL',
+      status: String(result.status || '').toUpperCase(),
+      externalId: result.providerIntentId,
+      message: result.copyPasteCode ? 'QR Pix généré. Paiement en attente de confirmation bancaire.' : 'Intention Pix créée.',
+      createdAt: new Date().toISOString()
+    });
+  }, [result, amount, onTracked]);
+
+  React.useEffect(() => {
+    if (!result?.providerIntentId || !['requires_action', 'processing', 'requires_confirmation'].includes(String(result.status || '').toLowerCase())) {
+      return undefined;
+    }
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        setPolling(true);
+        const res = await fetch('/api/paygate/pix/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerIntentId: result.providerIntentId })
+        });
+        const data = await res.json().catch(() => null);
+        if (!active || !data?.ok) return;
+        setResult((current) => ({ ...current, ...data }));
+        if (['succeeded', 'canceled', 'requires_payment_method'].includes(String(data.status || '').toLowerCase())) {
+          clearInterval(interval);
+        }
+      } catch (_) {
+        // Ignore a polling tick and retry on next pass.
+      } finally {
+        if (active) setPolling(false);
+      }
+    }, 4000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [result]);
+
+  const createPixIntent = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/paygate/pix/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountCents: Math.round(Number(amount) * 100),
+          customerEmail: email,
+          orderId: orderId || `SH-PIX-${Date.now()}`,
+          description: description || 'Smith-Heffa Pix payment'
+        })
+      });
+      const data = await res.json().catch(() => null);
+      setResult(data);
+    } catch (error) {
+      setResult({ ok: false, error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyPixCode = async () => {
+    if (!result?.copyPasteCode || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(result.copyPasteCode);
+  };
+
+  const refreshStatus = async () => {
+    if (!result?.providerIntentId) return;
+    setPolling(true);
+    try {
+      const res = await fetch('/api/paygate/pix/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerIntentId: result.providerIntentId })
+      });
+      const data = await res.json().catch(() => null);
+      if (data) setResult((current) => ({ ...current, ...data }));
+    } finally {
+      setPolling(false);
+    }
+  };
+
+  const status = String(result?.status || '').toLowerCase();
+  const isSuccess = status === 'succeeded';
+  const isFailure = ['canceled', 'requires_payment_method'].includes(status);
+
+  return (
+    <form onSubmit={createPixIntent} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        { label: 'Rail local Brésil', tone: 'info' },
+        { label: 'QR Code + Pix Copia e Cola', tone: 'warn' },
+        { label: 'Webhook asynchrone requis', tone: 'info' }
+      ]} />
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <RailBadge label="BR - Brésil" imageUrl={BRAZIL_FLAG} tint="#f0fdf4" />
+        <RailBadge label="Stripe Pix" tint="#f5f3ff" />
+      </div>
+      <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (BRL)" min="1" step="any" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="text" value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="Référence commande (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description marchande" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${isFailure ? '#fecaca' : isSuccess ? '#bbf7d0' : '#bfdbfe'}`, backgroundColor: isFailure ? '#fef2f2' : isSuccess ? '#f0fdf4' : '#eff6ff', color: isFailure ? '#991b1b' : isSuccess ? '#166534' : '#1d4ed8', display: 'grid', gap: '8px', fontSize: '12px' }}>
+          <div><strong>{result.ok ? 'Pix prêt' : 'Erreur Pix'}</strong></div>
+          <div>{result.message || result.error || `Statut Stripe: ${result.status}`}</div>
+          {result.providerIntentId ? <div>Intent: <span style={{ fontFamily: 'monospace' }}>{result.providerIntentId}</span></div> : null}
+          {result.qrCodeUrl ? <img src={result.qrCodeUrl} alt="QR Code Pix" style={{ width: '180px', maxWidth: '100%', borderRadius: '12px', border: '1px solid #e5e7eb', backgroundColor: '#fff', padding: '8px' }} /> : null}
+          {result.copyPasteCode ? (
+            <div style={{ display: 'grid', gap: '8px' }}>
+              <textarea readOnly value={result.copyPasteCode} rows={3} style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #d4d4d8', padding: '10px 12px', fontSize: '12px', fontFamily: 'monospace', resize: 'vertical', minHeight: '88px' }} />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" onClick={copyPixCode} style={{ height: '38px', borderRadius: '10px', backgroundColor: '#fff', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: '800', fontSize: '12px', cursor: 'pointer', padding: '0 12px' }}>
+                  Copier le code Pix
+                </button>
+                {result.hostedInstructionsUrl ? (
+                  <a href={result.hostedInstructionsUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', height: '38px', borderRadius: '10px', backgroundColor: '#fff', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: '800', fontSize: '12px', textDecoration: 'none', padding: '0 12px' }}>
+                    Ouvrir les instructions Stripe
+                  </a>
+                ) : null}
+                <button type="button" onClick={refreshStatus} disabled={polling} style={{ height: '38px', borderRadius: '10px', backgroundColor: '#fff', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: '800', fontSize: '12px', cursor: polling ? 'not-allowed' : 'pointer', padding: '0 12px' }}>
+                  {polling ? '⏳ Vérification...' : 'Rafraîchir le statut'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+      <button type="submit" disabled={loading} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#16a34a', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Génération Pix...' : 'Créer un paiement Pix'}
       </button>
     </form>
   );
@@ -1225,11 +1392,12 @@ export default function Dashboard() {
   }, []);
 
   const loadFdxData = React.useCallback(async () => {
-    const [meRes, consentsRes, accountsRes, auditRes] = await Promise.all([
+    const [meRes, consentsRes, accountsRes, auditRes, ledgerRes] = await Promise.all([
       fetch('/api/auth/me'),
       fetch('/api/fdx/v6/consents'),
       fetch('/api/fdx/v6/accounts'),
-      fetch('/api/fdx/v6/audit/events')
+      fetch('/api/fdx/v6/audit/events'),
+      fetch('/api/paygate/ledger/recent')
     ]);
 
     const me = await meRes.json().catch(() => null);
@@ -1241,11 +1409,29 @@ export default function Dashboard() {
     const consents = await consentsRes.json().catch(() => ({ consents: [] }));
     const accounts = await accountsRes.json().catch(() => ({ accounts: [] }));
     const audit = await auditRes.json().catch(() => ({ events: [] }));
+    const ledger = await ledgerRes.json().catch(() => ({ items: [] }));
 
     setSessionUser(me.user || null);
     setFdxConsents(Array.isArray(consents.consents) ? consents.consents : []);
     setFdxAccounts(Array.isArray(accounts.accounts) ? accounts.accounts : []);
     setFdxAuditEvents(Array.isArray(audit.events) ? audit.events : []);
+    setTrackedTransactions((currentItems) => {
+      const next = [...currentItems];
+      for (const item of Array.isArray(ledger.items) ? ledger.items : []) {
+        const index = next.findIndex((existing) => existing.id === item.id);
+        if (index >= 0) {
+          next[index] = { ...next[index], ...item };
+          continue;
+        }
+        next.push({
+          ...item,
+          history: [{ status: item.status || 'UNKNOWN', at: item.createdAt || new Date().toISOString(), message: item.message || '' }]
+        });
+      }
+      return next
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 12);
+    });
   }, []);
 
   React.useEffect(() => {
@@ -1398,6 +1584,10 @@ export default function Dashboard() {
                     disabled={loading.paypal} style={btnStyle('#003087')}>
                     {loading.paypal ? '⏳...' : 'Payer avec PayPal'}
                   </button>
+                </RailCard>
+
+                <RailCard icon="🇧🇷" label="Pix Brasil" desc="Rail instantané Brésil via Stripe Pix. QR Code, Pix copia e cola, confirmation webhook." accentColor="#16a34a">
+                  <PixForm onTracked={pushTransaction} />
                 </RailCard>
 
               </div>

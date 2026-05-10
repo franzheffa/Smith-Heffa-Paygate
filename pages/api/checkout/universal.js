@@ -3,6 +3,7 @@ import { resolveUniversalRoute } from '../../../lib/paygate/router';
 
 function getNextAction(sourceRail) {
   if (sourceRail === 'PAWAPAY') return 'START_MOBILE_MONEY_COLLECTION';
+  if (sourceRail === 'PIX_BR') return 'START_PIX_QR_COLLECTION';
   if (sourceRail === 'CAMPOST') return 'START_CAMPOST_COLLECTION';
   if (sourceRail === 'INTERAC') return 'START_INTERAC_REQUEST_MONEY';
   if (sourceRail === 'STRIPE') return 'START_STRIPE_CHECKOUT';
