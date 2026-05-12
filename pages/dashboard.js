@@ -988,6 +988,39 @@ function PixForm({ onTracked }) {
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const [result, setResult] = useState(null);
+  const [pixConfig, setPixConfig] = useState({ loading: true, ready: false, missing: [], warnings: [] });
+
+  React.useEffect(() => {
+    let active = true;
+    const loadPixConfig = async () => {
+      try {
+        const res = await fetch('/api/paygate/pix/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'preflight' })
+        });
+        const data = await res.json().catch(() => null);
+        if (!active) return;
+        setPixConfig({
+          loading: false,
+          ready: !!data?.ready,
+          missing: Array.isArray(data?.missing) ? data.missing : [],
+          warnings: Array.isArray(data?.warnings) ? data.warnings : []
+        });
+      } catch (_) {
+        if (!active) return;
+        setPixConfig({
+          loading: false,
+          ready: false,
+          missing: ['PIX preflight indisponible'],
+          warnings: []
+        });
+      }
+    };
+
+    loadPixConfig();
+    return () => { active = false; };
+  }, []);
 
   React.useEffect(() => {
     if (!result?.providerIntentId) return;
@@ -1045,6 +1078,10 @@ function PixForm({ onTracked }) {
 
   const createPixIntent = async (e) => {
     e.preventDefault();
+    if (!pixConfig.ready) {
+      setResult({ ok: false, error: 'Pix non configuré. Vérifiez STRIPE_SECRET_KEY et STRIPE_PIX_WEBHOOK_SECRET.' });
+      return;
+    }
     setLoading(true);
     setResult(null);
     try {
@@ -1091,10 +1128,12 @@ function PixForm({ onTracked }) {
   const status = String(result?.status || '').toLowerCase();
   const isSuccess = status === 'succeeded';
   const isFailure = ['canceled', 'requires_payment_method'].includes(status);
+  const pixOperational = pixConfig.ready && pixConfig.missing.length === 0;
 
   return (
     <form onSubmit={createPixIntent} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
       <InfoPills items={[
+        { label: pixConfig.loading ? 'Vérification Pix…' : pixOperational ? 'Pix operational' : 'Pix config missing', tone: pixConfig.loading ? 'warn' : pixOperational ? 'info' : 'danger' },
         { label: 'Rail local Brésil', tone: 'info' },
         { label: 'QR Code + Pix Copia e Cola', tone: 'warn' },
         { label: 'Webhook asynchrone requis', tone: 'info' }
@@ -1103,6 +1142,13 @@ function PixForm({ onTracked }) {
         <RailBadge label="BR - Brésil" imageUrl={BRAZIL_FLAG} tint="#f0fdf4" />
         <RailBadge label="Stripe Pix" tint="#f5f3ff" />
       </div>
+      {(!pixOperational || pixConfig.warnings.length > 0) && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${pixOperational ? '#fed7aa' : '#fecaca'}`, backgroundColor: pixOperational ? '#fff7ed' : '#fef2f2', color: pixOperational ? '#9a3412' : '#991b1b', display: 'grid', gap: '6px', fontSize: '12px' }}>
+          <div><strong>{pixOperational ? 'Pix prêt avec avertissements' : 'Pix en attente de configuration'}</strong></div>
+          {pixConfig.missing.map((item) => <div key={`missing-${item}`}>Manquant: {item}</div>)}
+          {pixConfig.warnings.map((item) => <div key={`warning-${item}`}>Avertissement: {item}</div>)}
+        </div>
+      )}
       <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (BRL)" min="1" step="any" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
       <input type="text" value={orderId} onChange={(e) => setOrderId(e.target.value)} placeholder="Référence commande (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
@@ -1133,7 +1179,7 @@ function PixForm({ onTracked }) {
           ) : null}
         </div>
       )}
-      <button type="submit" disabled={loading} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#16a34a', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+      <button type="submit" disabled={loading || !pixConfig.ready} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading || !pixConfig.ready ? '#6b7280' : '#16a34a', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading || !pixConfig.ready ? 'not-allowed' : 'pointer' }}>
         {loading ? '⏳ Génération Pix...' : 'Créer un paiement Pix'}
       </button>
     </form>
@@ -1169,6 +1215,23 @@ function UniversalCheckoutForm({ onTracked }) {
   const [result, setResult] = useState(null);
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const pixPrefillActive = String(form.sourceCountry || '').toUpperCase() === 'BR' || String(form.sourceCurrency || '').toUpperCase() === 'BRL';
+
+  React.useEffect(() => {
+    if (!pixPrefillActive) return;
+    setForm((current) => {
+      const nextCountry = 'BR';
+      const nextCurrency = 'BRL';
+      if (current.sourceCountry === nextCountry && current.sourceCurrency === nextCurrency) {
+        return current;
+      }
+      return {
+        ...current,
+        sourceCountry: nextCountry,
+        sourceCurrency: nextCurrency
+      };
+    });
+  }, [pixPrefillActive]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1180,6 +1243,7 @@ function UniversalCheckoutForm({ onTracked }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          ...(String(form.sourceCountry || '').toUpperCase() === 'BR' && String(form.sourceCurrency || '').toUpperCase() === 'BRL' ? { sourceRail: 'PIX_BR' } : {}),
           merchantId: 'smith-heffa-platform',
           amountDestination: form.amountSource
         })
@@ -1215,8 +1279,15 @@ function UniversalCheckoutForm({ onTracked }) {
     <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
       <InfoPills items={[
         { label: 'Aucune donnée de paiement conservée', tone: 'info' },
-        { label: 'Confirmation forte obligatoire', tone: 'warn' }
+        { label: 'Confirmation forte obligatoire', tone: 'warn' },
+        ...(String(form.sourceCountry || '').toUpperCase() === 'BR' && String(form.sourceCurrency || '').toUpperCase() === 'BRL' ? [{ label: 'Source préremplie PIX_BR', tone: 'info' }] : [])
       ]} />
+      {String(form.sourceCountry || '').toUpperCase() === 'BR' && String(form.sourceCurrency || '').toUpperCase() === 'BRL' ? (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', backgroundColor: '#f0fdf4', color: '#166534', display: 'grid', gap: '4px', fontSize: '12px' }}>
+          <div><strong>Préremplissage Brésil actif</strong></div>
+          <div>Le checkout proposera automatiquement le rail source <strong>PIX_BR</strong> côté UI et côté API.</div>
+        </div>
+      ) : null}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
         <select value={form.useCase} onChange={(e) => update('useCase', e.target.value)} style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
           <option value="RIDE">Ride</option>
@@ -1365,6 +1436,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState({});
   const [results, setResults] = useState({});
   const [trackedTransactions, setTrackedTransactions] = useState([]);
+  const [trackerRailFilter, setTrackerRailFilter] = useState('ALL');
+  const [trackerCountryFilter, setTrackerCountryFilter] = useState('ALL');
 
   const pushTransaction = React.useCallback((entry) => {
     if (!entry?.id) return;
@@ -1390,6 +1463,23 @@ export default function Dashboard() {
       return next.slice(0, 12);
     });
   }, []);
+
+  const trackerRailOptions = useMemo(() => {
+    return ['ALL', ...Array.from(new Set(trackedTransactions.map((item) => item.selectedRail || item.railLabel).filter(Boolean)))];
+  }, [trackedTransactions]);
+
+  const trackerCountryOptions = useMemo(() => {
+    return ['ALL', ...Array.from(new Set(trackedTransactions.map((item) => item.country).filter(Boolean)))];
+  }, [trackedTransactions]);
+
+  const filteredTrackedTransactions = useMemo(() => {
+    return trackedTransactions.filter((item) => {
+      const railValue = item.selectedRail || item.railLabel;
+      const railOk = trackerRailFilter === 'ALL' || railValue === trackerRailFilter;
+      const countryOk = trackerCountryFilter === 'ALL' || item.country === trackerCountryFilter;
+      return railOk && countryOk;
+    });
+  }, [trackedTransactions, trackerRailFilter, trackerCountryFilter]);
 
   const loadFdxData = React.useCallback(async () => {
     const [meRes, consentsRes, accountsRes, auditRes, ledgerRes] = await Promise.all([
@@ -1644,7 +1734,21 @@ export default function Dashboard() {
               <div style={{ fontSize: '13px', color: '#52525b', marginBottom: '16px' }}>
                 Vue consolidée des transactions récentes, du rail choisi par le routeur, et de l’évolution de statut.
               </div>
-              <TransactionTracker items={trackedTransactions} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+                <select value={trackerRailFilter} onChange={(e) => setTrackerRailFilter(e.target.value)}
+                  style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+                  {trackerRailOptions.map((item) => (
+                    <option key={item} value={item}>{item === 'ALL' ? 'Tous les rails' : item}</option>
+                  ))}
+                </select>
+                <select value={trackerCountryFilter} onChange={(e) => setTrackerCountryFilter(e.target.value)}
+                  style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px', backgroundColor: '#fff' }}>
+                  {trackerCountryOptions.map((item) => (
+                    <option key={item} value={item}>{item === 'ALL' ? 'Tous les pays' : item}</option>
+                  ))}
+                </select>
+              </div>
+              <TransactionTracker items={filteredTrackedTransactions} />
             </div>
 
             {/* ─── VIREMENTS BANCAIRES ─── */}

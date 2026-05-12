@@ -32,10 +32,12 @@ export default async function handler(req, res) {
   const action = String(req.body?.action || '').toLowerCase();
   if (action === 'preflight') {
     const secret = String(process.env.STRIPE_SECRET_KEY || '').trim();
-    const missing = ['STRIPE_SECRET_KEY'].filter((key) => !process.env[key]);
+    const missing = ['STRIPE_SECRET_KEY', 'STRIPE_PIX_WEBHOOK_SECRET'].filter((key) => !process.env[key]);
     const warnings = [];
     if (looksLikePlaceholder(secret)) warnings.push('STRIPE_SECRET_KEY looks like placeholder');
-    if (!process.env.STRIPE_PIX_WEBHOOK_SECRET) warnings.push('STRIPE_PIX_WEBHOOK_SECRET missing');
+    if (process.env.STRIPE_PIX_WEBHOOK_SECRET && String(process.env.STRIPE_PIX_WEBHOOK_SECRET).trim().length < 12) {
+      warnings.push('STRIPE_PIX_WEBHOOK_SECRET looks unusually short');
+    }
     return res.status(200).json({
       ready: missing.length === 0,
       missing,

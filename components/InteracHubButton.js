@@ -13,7 +13,7 @@ export default function InteracHubButton({ onVerified }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('interac_auth') === 'success') {
+    if (params.get('interac_auth') === 'success' || params.get('interac_auth') === 'processing') {
       window.history.replaceState({}, '', '/dashboard');
       startPolling();
     } else if (params.get('interac_error')) {
@@ -34,11 +34,14 @@ export default function InteracHubButton({ onVerified }) {
         setUserInfo(data);
         setStatus('verified');
         onVerified?.(data);
+      } else if (data.processing) {
+        startPolling();
       }
     } catch {}
   }
 
   function startPolling() {
+    if (pollRef.current) clearInterval(pollRef.current);
     setStatus('polling');
     let attempts = 0;
     pollRef.current = setInterval(async () => {
@@ -51,12 +54,19 @@ export default function InteracHubButton({ onVerified }) {
           setUserInfo(data);
           setStatus('verified');
           onVerified?.(data);
+        } else if (data.processing) {
+          if (attempts >= 40) {
+            clearInterval(pollRef.current);
+            setStatus('verified_no_claims');
+          }
         } else if (attempts >= 20) {
           // Après 20 tentatives (60s), on abandonne le polling
           clearInterval(pollRef.current);
           // Essaie quand même de récupérer userinfo directement
           const ui = await fetch('/api/interac/userinfo');
-          if (ui.ok) {
+          if (ui.status === 202) {
+            setStatus('verified_no_claims');
+          } else if (ui.ok) {
             const d = await ui.json();
             setUserInfo(d);
             setStatus('verified');
@@ -114,7 +124,7 @@ export default function InteracHubButton({ onVerified }) {
         marginBottom: '12px',
       }}>
         <span style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>⏳</span>
-        <span style={{ fontSize: '13px' }}>Vérification en cours avec Interac Hub...</span>
+        <span style={{ fontSize: '13px' }}>Vérification en cours avec Interac Hub et votre banque...</span>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );

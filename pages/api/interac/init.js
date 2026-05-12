@@ -3,11 +3,21 @@ import { generateCodeVerifier, generateCodeChallenge, buildAuthUrl } from '../..
 
 export default async function handler(req, res) {
   try {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.setHeader('Allow', 'GET, HEAD');
+      return res.status(405).json({ error: 'Method Not Allowed' });
+    }
     const cv = generateCodeVerifier();
     const cc = generateCodeChallenge(cv);
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
     const authUrl = await buildAuthUrl({ state, nonce, codeChallenge: cc });
+
+    console.log('[interac/init]', {
+      method: req.method,
+      redirectHost: new URL(authUrl).host,
+      hasRequestObject: authUrl.includes('request='),
+    });
 
     const secure = process.env.NODE_ENV === 'production';
     const base = `HttpOnly; Path=/; Max-Age=600; SameSite=Lax${secure ? '; Secure' : ''}`;

@@ -47,7 +47,11 @@ export default async function handler(req, res) {
 
     // Tente de récupérer userinfo immédiatement (mode sync)
     try {
-      const userInfo = await fetchUserInfo(tokens.access_token);
+      const userInfoResult = await fetchUserInfo(tokens.access_token);
+      if (userInfoResult.status === 'processing') {
+        return res.redirect('/dashboard?interac_auth=processing');
+      }
+      const userInfo = userInfoResult.data;
       // Stocke le sub si disponible
       if (userInfo.sub) {
         res.setHeader('Set-Cookie', [
