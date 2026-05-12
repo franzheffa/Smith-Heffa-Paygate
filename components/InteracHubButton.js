@@ -36,6 +36,9 @@ export default function InteracHubButton({ onVerified }) {
         onVerified?.(data);
       } else if (data.processing) {
         startPolling();
+      } else if (data.error) {
+        setError(data.error);
+        setStatus('error');
       }
     } catch {}
   }
@@ -138,6 +141,9 @@ export default function InteracHubButton({ onVerified }) {
           padding: '10px 14px', color: '#CC0000', fontSize: '12px', marginBottom: '8px',
         }}>
           ⚠️ {error || 'Erreur Interac. Réessaie.'}
+        </div>
+        <div style={{ fontSize: '11px', color: '#7f1d1d', marginBottom: '8px' }}>
+          Si le portail Interac affiche une erreur après le choix de banque, le handoff Smith-Heffa est déjà actif et l’élément restant se situe généralement dans la configuration du tenant / parcours de vérification côté Interac.
         </div>
         <button onClick={startInteracFlow} style={btnStyle}>
           🍁 Réessayer avec Interac

@@ -240,6 +240,119 @@ function TransactionTracker({ items }) {
   );
 }
 
+function CampostForm({ onTracked }) {
+  const [amount, setAmount] = useState('');
+  const [phone, setPhone] = useState('');
+  const [reference, setReference] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [config, setConfig] = useState({ loading: true, ready: false, missing: [], warnings: [] });
+
+  React.useEffect(() => {
+    let active = true;
+    const loadConfig = async () => {
+      try {
+        const res = await fetch('/api/campost/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'preflight' })
+        });
+        const data = await res.json().catch(() => null);
+        if (!active) return;
+        setConfig({
+          loading: false,
+          ready: !!data?.ready,
+          missing: Array.isArray(data?.missing) ? data.missing : [],
+          warnings: Array.isArray(data?.warnings) ? data.warnings : []
+        });
+      } catch (_) {
+        if (!active) return;
+        setConfig({ loading: false, ready: false, missing: ['CAMPOST preflight indisponible'], warnings: [] });
+      }
+    };
+    loadConfig();
+    return () => { active = false; };
+  }, []);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/campost/intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(amount),
+          currency: 'XAF',
+          customerPhone: phone,
+          reference: reference || `SH-CAMPOST-${Date.now()}`,
+          description: description || 'Smith-Heffa Campost local rail'
+        })
+      });
+      const data = await res.json().catch(() => null);
+      setResult(data);
+      onTracked?.({
+        id: `campost-${data?.externalId || Date.now()}`,
+        railLabel: 'Campost',
+        selectedRail: 'CAMPOST',
+        operation: 'PAYMENT',
+        country: 'CM',
+        countryLabel: 'CM - Cameroun',
+        countryFlag: '/images/flags/cmr.svg',
+        provider: 'campost',
+        providerLabel: 'Campost Local Rail',
+        amount,
+        currency: 'XAF',
+        status: String(data?.status || 'PENDING').toUpperCase(),
+        externalId: data?.externalId || '',
+        message: data?.message || data?.error || '',
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      setResult({ ok: false, error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+      <InfoPills items={[
+        { label: config.loading ? 'Vérification Campost…' : config.ready ? 'Campost operational' : 'Campost config missing', tone: config.loading ? 'warn' : config.ready ? 'info' : 'danger' },
+        { label: 'Rail souverain local', tone: 'info' },
+        { label: 'Cash-in / cash-out préparatoire', tone: 'warn' }
+      ]} />
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <RailBadge label="CM - Cameroun" imageUrl="/images/flags/cmr.svg" tint="#fafafa" />
+        <RailBadge label="Campost" tint="#fafafa" />
+      </div>
+      {(!config.ready || config.warnings.length > 0) && (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${config.ready ? '#fed7aa' : '#fecaca'}`, backgroundColor: config.ready ? '#fff7ed' : '#fef2f2', color: config.ready ? '#9a3412' : '#991b1b', display: 'grid', gap: '6px', fontSize: '12px' }}>
+          <div><strong>{config.ready ? 'Campost prêt avec avertissements' : 'Campost en attente de configuration'}</strong></div>
+          {config.missing.map((item) => <div key={`campost-missing-${item}`}>Manquant: {item}</div>)}
+          {config.warnings.map((item) => <div key={`campost-warning-${item}`}>Avertissement: {item}</div>)}
+        </div>
+      )}
+      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone client / compte Campost" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant (XAF)" min="1" step="any" required style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Référence Campost" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description locale" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {result ? (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, backgroundColor: result.ok ? '#f0fdf4' : '#fef2f2', color: result.ok ? '#166534' : '#991b1b', fontSize: '12px', display: 'grid', gap: '4px' }}>
+          <div><strong>{result.ok ? 'Intention Campost préparée' : 'Campost en attente'}</strong></div>
+          <div>{result.message || result.error}</div>
+          {result.externalId ? <div>ID: <span style={{ fontFamily: 'monospace' }}>{result.externalId}</span></div> : null}
+        </div>
+      ) : null}
+      <button type="submit" disabled={loading} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : '#14532d', color: '#fff', border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        {loading ? '⏳ Préparation...' : 'Préparer Campost'}
+      </button>
+    </form>
+  );
+}
+
 // Formulaire Mobile Money
 function MobileMoneyForm({ provider, color, onSubmit, loading, result, onTracked }) {
   const countries = MM_COUNTRIES[provider] || [];
@@ -1315,6 +1428,8 @@ function UniversalCheckoutForm({ onTracked }) {
           <div><strong>{result.ok ? 'Checkout routé' : 'Erreur checkout'}</strong></div>
           <div>{result.message || result.error}</div>
           {result.route ? <div>Source: <strong>{result.route.sourceRail}</strong> · Destination: <strong>{result.route.destinationRail}</strong></div> : null}
+          {result.route?.fallback?.destination?.length ? <div>Fallback destination: <strong>{result.route.fallback.destination.join(' → ')}</strong></div> : null}
+          {result.route?.fallback?.source?.length ? <div>Fallback source: <strong>{result.route.fallback.source.join(' → ')}</strong></div> : null}
           {result.nextAction ? <div>Étape suivante: {result.nextAction}</div> : null}
         </div>
       )}
@@ -1724,6 +1839,10 @@ export default function Dashboard() {
                   <MobileMoneyForm provider="mpesa" color="#00A550"
                     onSubmit={body => post('mpesa', '/api/mobile-money-payout', body)}
                     loading={!!loading.mpesa} result={results.mpesa} onTracked={pushTransaction} />
+                </RailCard>
+
+                <RailCard icon="📮" label="Campost" desc="Rail souverain local Cameroun. Préparation de l’intention et readiness API sans toucher au cœur existant." accentColor="#14532d">
+                  <CampostForm onTracked={pushTransaction} />
                 </RailCard>
 
               </div>
