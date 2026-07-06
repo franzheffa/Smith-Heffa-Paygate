@@ -1,0 +1,94 @@
+workflows:
+  ios-release:
+    name: Smith-Heffa Paygate iOS Release
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      node: 22.19.0
+      vars:
+        APP_NAME: "Smith-Heffa Paygate"
+        BUNDLE_ID: "ca.smithheffa.paygate"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/Library/Caches/CocoaPods
+    scripts:
+      - name: Install JavaScript dependencies
+        script: npm ci
+      - name: Sync Capacitor iOS shell
+        script: npm run cap:sync:ios
+      - name: Set bundle identifier
+        script: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" ios/App/App/Info.plist
+      - name: Build unsigned IPA
+        script: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            archive
+      - name: Export IPA
+        script: |
+          mkdir -p $CM_BUILD_DIR/build/export
+          cat > $CM_BUILD_DIR/build/export/ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>${APP_STORE_CONNECT_TEAM_ID}</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild \
+            -exportArchive \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            -exportPath $CM_BUILD_DIR/build/export \
+            -exportOptionsPlist $CM_BUILD_DIR/build/export/ExportOptions.plist
+    artifacts:
+      - build/export/*.ipa
+      - build/App.xcarchive
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+  android-release:
+    name: Smith-Heffa Paygate Android Release
+    max_build_duration: 60
+    environment:
+      java: 17
+      node: 22.19.0
+      vars:
+        APP_NAME: "Smith-Heffa Paygate"
+        APPLICATION_ID: "ca.smithheffa.paygate"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+    scripts:
+      - name: Install JavaScript dependencies
+        script: npm ci
+      - name: Sync Capacitor Android shell
+        script: npm run cap:sync:android
+      - name: Build Android App Bundle
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal

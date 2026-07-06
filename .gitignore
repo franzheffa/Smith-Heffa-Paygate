@@ -250,3 +250,10 @@ ModelManifest.xml
 .env*.local
 .env.local
 *.zip
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcworkspace/xcshareddata/swiftpm/
+DerivedData/
+android/.gradle/
+android/local.properties
+android/app/build/

@@ -3,12 +3,27 @@
   "version": "1.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/run-next-with-local-env.cjs dev",
+    "build": "node scripts/run-next-with-local-env.cjs build",
+    "start": "node scripts/run-next-with-local-env.cjs start",
+    "sync": "npx cap sync",
+    "ios": "npx cap open ios",
+    "android": "npx cap open android",
+    "cap:sync": "npx cap sync",
+    "cap:sync:ios": "npx cap sync ios",
+    "cap:sync:android": "npx cap sync android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
+    "ios:prepare": "npm run cap:sync:ios",
+    "android:prepare": "npm run cap:sync:android",
+    "mobile:prepare": "npm run cap:sync",
     "postinstall": "prisma generate && ( [ -n \"$DATABASE_URL\" ] && prisma migrate deploy || echo \"Skipping prisma migrate deploy: DATABASE_URL not set\" )"
   },
   "dependencies": {
+    "@capacitor/android": "8.4.1",
+    "@capacitor/cli": "8.4.1",
+    "@capacitor/core": "8.4.1",
+    "@capacitor/ios": "8.4.1",
     "@prisma/client": "6.4.1",
     "bcryptjs": "^3.0.3",
     "lucide-react": "latest",
@@ -19,7 +34,8 @@
     "stripe": "latest"
   },
   "devDependencies": {
-    "prisma": "6.4.1"
+    "prisma": "6.4.1",
+    "typescript": "6.0.3"
   },
   "overrides": {
     "esbuild": "0.18.12"
