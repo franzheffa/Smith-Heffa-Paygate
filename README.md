@@ -18,9 +18,11 @@ cat > .env.local <<'EOF'
 STRIPE_SECRET_KEY=sk_live_replace_me
 STRIPE_WEBHOOK_SECRET=whsec_replace_me
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_replace_me
-NEXT_PUBLIC_APP_URL=https://smith-heffa-paygate.vercel.app
+NEXT_PUBLIC_APP_URL=https://smith-heffa-paygate.ca
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?schema=public
 MOBILE_MONEY_API_KEY=replace_me
+PUBLIC_APP_URL=https://smith-heffa-paygate.ca
+NEXTAUTH_URL=https://smith-heffa-paygate.ca
 PAWAPAY_API_BASE_URL=https://api.sandbox.pawapay.io
 PAWAPAY_API_TOKEN=replace_me
 ORANGE_MONEY_API_BASE_URL=https://api.orange-money.example
@@ -40,7 +42,7 @@ INTERAC_OIDC_WELL_KNOWN_URL=https://gateway-portal.hub-verify.innovation.interac
 INTERAC_HUB_BASE_URL=https://gateway-portal.hub-verify.innovation.interac.ca
 INTERAC_CLIENT_ID=replace_me
 INTERAC_SCOPES=openid onlyVme_scope
-INTERAC_REDIRECT_URI=https://smith-heffa-paygate.vercel.app/api/interac/callback
+INTERAC_REDIRECT_URI=https://smith-heffa-paygate.ca/api/interac/callback
 INTERAC_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 INTERAC_KID=replace_me
 INTERAC_PUBLIC_KEY_N=replace_me
@@ -53,7 +55,7 @@ ORANGE_ORDERING_BASE_URL=https://api.orange.com/ordering/b2b/v3
 ORANGE_OAUTH_TOKEN_URL=https://api.orange.com/oauth/v3/token
 ORANGE_OIDC_TOKEN_URL=https://api.orange.com/oauth/v3/token
 ORANGE_OIDC_AUTHORIZE_URL=https://api.orange.com/oauth/v3/authorize
-ORANGE_OIDC_REDIRECT_URI=https://smith-heffa-paygate.vercel.app/api/oidc/callback
+ORANGE_OIDC_REDIRECT_URI=https://smith-heffa-paygate.ca/api/oidc/callback
 ORANGE_OIDC_SCOPE=openid dpv:FraudPreventionAndDetection number-verification:verify
 ORANGE_OIDC_CIBA_AUTHORIZE_URL=https://api.orange.com/oauth/v3/bc-authorize
 ORANGE_OIDC_CIBA_TOKEN_URL=https://api.orange.com/oauth/v3/token
@@ -158,14 +160,38 @@ git push origin main
 
 URLs à configurer dans le dashboard sandbox pawaPay:
 
-- Deposits: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/deposits`
-- Payouts: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/payouts`
-- Refunds: `https://smith-heffa-paygate.vercel.app/api/pawapay/callback/refunds`
+- Deposits: `https://smith-heffa-paygate.ca/api/pawapay/callback/deposits`
+- Payouts: `https://smith-heffa-paygate.ca/api/pawapay/callback/payouts`
+- Refunds: `https://smith-heffa-paygate.ca/api/pawapay/callback/refunds`
 
 Quand le live sera ouvert, garde les mêmes paths et change seulement:
 
 - le token
 - `PAWAPAY_API_BASE_URL` vers `https://api.pawapay.io`
+
+## 5ter) Wrapper iOS App Store
+
+Le repo inclut maintenant des wrappers Capacitor iOS + Android pour publier `Smith-Heffa Paygate` sur l'App Store et le Play Store sans modifier l'application web existante.
+
+- App name: `Smith-Heffa Paygate`
+- iOS bundle ID: `ca.smithheffa.paygate`
+- Android application ID: `ca.smithheffa.paygate`
+- URL chargée par l'app: `https://smith-heffa-paygate.ca`
+
+Commandes utiles:
+
+```bash
+npm run cap:sync
+npm run cap:sync:ios
+npm run cap:open:ios
+npm run cap:sync:android
+npm run cap:open:android
+```
+
+Build cloud:
+
+- pipelines prêtes dans `codemagic.yaml`
+- documentation App Store Connect / TestFlight / Google Play Console dans `docs/mobile-stores.md`
 
 ## 6) Passage en flux réel Interac -> Orange Money (important)
 
@@ -203,7 +229,7 @@ cat > /tmp/orange-ordering-status.json <<'EOF'
 }
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/orange-ordering" \
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/orange-ordering" \
   -H "Content-Type: application/json" \
   --data-binary @/tmp/orange-ordering-status.json
 ```
@@ -244,12 +270,12 @@ cat > /tmp/sepa-payout.json <<'EOF'
 {"rail":"sepa","amount":1200,"currency":"EUR","beneficiaryName":"Franz Heffa","iban":"FR7630006000011234567890189","reference":"SEPA-001","dryRun":true}
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/stripe-payment-intent" -H "Content-Type: application/json" --data-binary @/tmp/stripe-intent.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/applepay-intent" -H "Content-Type: application/json" --data-binary @/tmp/applepay-intent.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mtn-payout.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mpesa-payout.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/swift-payout.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/sepa-payout.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/stripe-payment-intent" -H "Content-Type: application/json" --data-binary @/tmp/stripe-intent.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/applepay-intent" -H "Content-Type: application/json" --data-binary @/tmp/applepay-intent.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mtn-payout.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mobile-money-payout" -H "Content-Type: application/json" --data-binary @/tmp/mpesa-payout.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/swift-payout.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/bank-transfer-payout" -H "Content-Type: application/json" --data-binary @/tmp/sepa-payout.json
 ```
 
 MTN MoMo (route dédiée officielle) :
@@ -267,9 +293,9 @@ cat > /tmp/mtn-transfer.json <<'EOF'
 {"action":"transfer","amount":"1000","currency":"XAF","msisdn":"237690000000","externalId":"DISB-001","payerMessage":"Payout","payeeNote":"Payout","referenceId":"1af0bc90-3906-4f72-bebc-34f87e47a3d6"}
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-preflight.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-requesttopay.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-transfer.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-preflight.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-requesttopay.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-transfer.json
 ```
 
 ## 9) Flux OIDC Frontend + PKCE (visible)
@@ -292,7 +318,7 @@ cat > /tmp/oidc-init.json <<'EOF'
 }
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/init" \
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/oidc/init" \
   -H "Content-Type: application/json" \
   --data-binary @/tmp/oidc-init.json
 ```
@@ -353,10 +379,10 @@ cat > /tmp/ciba-poll.json <<'EOF'
 }
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-start.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-preflight.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-token.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-poll.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-start.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-preflight.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-token.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/oidc/ciba" -H "Content-Type: application/json" --data-binary @/tmp/ciba-poll.json
 ```
 
 ## 11) Intégration MTN MoMo Payment APIs
@@ -409,7 +435,7 @@ cat > /tmp/mtn-transfer.json <<'EOF'
 }
 EOF
 
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-preflight.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-request-to-pay.json
-curl -sS -X POST "https://smith-heffa-paygate.vercel.app/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-transfer.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-preflight.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-request-to-pay.json
+curl -sS -X POST "https://smith-heffa-paygate.ca/api/mtn-momo" -H "Content-Type: application/json" --data-binary @/tmp/mtn-transfer.json
 ```
