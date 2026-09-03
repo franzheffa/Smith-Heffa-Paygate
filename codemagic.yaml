@@ -52,13 +52,70 @@ workflows:
 
           echo "=== Apply profiles to App.xcodeproj ==="
 
+          cp "$CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj" \
+            /tmp/project-before-signing.pbxproj
+
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
             --archive-method app-store \
             --code-signing-setup-verbose-logging
+
+          echo "=== Signing diff produced by use-profiles ==="
+          git diff --no-index \
+            /tmp/project-before-signing.pbxproj \
+            "$CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj" \
+            | egrep "CODE_SIGN|PROVISIONING_PROFILE|DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|^[+-]" \
+            || true
       - name: Diagnose provisioning profile
         script: |
           set -e
+
+          echo "=== Installed provisioning profiles ==="
+          MATCHING_PROFILE_FOUND=NO
+          MATCHING_PROFILE_NAME=""
+          MATCHING_PROFILE_UUID=""
+
+          for PROFILE in \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"/*.provisionprofile
+          do
+            [ -f "$PROFILE" ] || continue
+            security cms -D -i "$PROFILE" > /tmp/profile.plist
+
+            PROFILE_NAME="$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_UUID="$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_EXPIRATION="$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" /tmp/profile.plist 2>/dev/null || true)"
+
+            echo "Name: $PROFILE_NAME"
+            echo "UUID: $PROFILE_UUID"
+            echo "TeamIdentifier:0: $PROFILE_TEAM"
+            echo "Entitlements:application-identifier: $PROFILE_APP_ID"
+            echo "ExpirationDate: $PROFILE_EXPIRATION"
+
+            if [ "$PROFILE_TEAM" = "$APPLE_TEAM_ID" ] && \
+              [ "$PROFILE_APP_ID" = "$APPLE_TEAM_ID.$BUNDLE_ID" ]; then
+              MATCHING_PROFILE_FOUND=YES
+              MATCHING_PROFILE_NAME="$PROFILE_NAME"
+              MATCHING_PROFILE_UUID="$PROFILE_UUID"
+            fi
+          done
+
+          echo "MATCHING_PROFILE_FOUND: $MATCHING_PROFILE_FOUND"
+          echo "MATCHING_PROFILE_NAME: $MATCHING_PROFILE_NAME"
+          echo "MATCHING_PROFILE_UUID: $MATCHING_PROFILE_UUID"
+
+          echo "=== Available code-signing identities ==="
+          SIGNING_IDENTITIES="$(security find-identity -v -p codesigning || true)"
+          printf '%s\n' "$SIGNING_IDENTITIES"
+          if printf '%s\n' "$SIGNING_IDENTITIES" | grep -q "Apple Distribution:"; then
+            echo "SIGNING_IDENTITY_AVAILABLE: YES"
+          else
+            echo "SIGNING_IDENTITY_AVAILABLE: NO"
+          fi
 
           echo "=== Xcode Release signing settings after use-profiles ==="
           xcodebuild \
@@ -66,14 +123,17 @@ workflows:
             -scheme App \
             -configuration Release \
             -showBuildSettings | \
-            egrep "PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER" || true
+            egrep "TARGET_NAME|PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_ENTITLEMENTS" || true
 
           echo "=== Export options ==="
           if [ -f "$HOME/export_options.plist" ]; then
-            /usr/libexec/PlistBuddy -c "Print :method" "$HOME/export_options.plist" || true
-            /usr/libexec/PlistBuddy -c "Print :signingStyle" "$HOME/export_options.plist" || true
+            echo "EXPORT_OPTIONS_PRESENT: YES"
+            echo "EXPORT_METHOD: $(/usr/libexec/PlistBuddy -c "Print :method" "$HOME/export_options.plist" 2>/dev/null || true)"
+            echo "EXPORT_SIGNING_STYLE: $(/usr/libexec/PlistBuddy -c "Print :signingStyle" "$HOME/export_options.plist" 2>/dev/null || true)"
+            echo "EXPORT_PROFILE_MAPPING:"
             /usr/libexec/PlistBuddy -c "Print :provisioningProfiles" "$HOME/export_options.plist" || true
           else
+            echo "EXPORT_OPTIONS_PRESENT: NO"
             echo "NO_EXPORT_OPTIONS_PLIST"
           fi
       - name: Set display name
