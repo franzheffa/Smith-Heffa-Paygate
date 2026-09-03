@@ -1754,10 +1754,27 @@ export default function Dashboard() {
               <h1 style={{ margin: '0 0 6px', fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>💳 Enterprise Payment Rail</h1>
               <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>Console d'orchestration unifiée · 9 rails de paiement</p>
             </div>
-            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/auth/login'; }}
-              style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', border: `1px solid #3f3f46`, cursor: 'pointer' }}>
-              Déconnexion
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <a
+                href="/account/delete"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  color: '#fbbf24',
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  border: '1px solid rgba(251,191,36,0.35)',
+                  textDecoration: 'none'
+                }}
+              >
+                Account & Data Deletion
+              </a>
+              <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/auth/login'; }}
+                style={{ backgroundColor: '#27272a', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', border: `1px solid #3f3f46`, cursor: 'pointer' }}>
+                Déconnexion
+              </button>
+            </div>
           </section>
 
           <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
