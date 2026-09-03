@@ -8,8 +8,10 @@ workflows:
       xcode: latest
       node: 22.19.0
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.smithheffa.paygate
+        provisioning_profiles:
+          - SMITH_HEFFA_PAYGATE_APPSTORE_PROFILE_20260903
+        certificates:
+          - SMITH_HEFFA_PAYGATE_DISTRIBUTION
       vars:
         APP_NAME: "Smith-Heffa Paygate"
         BUNDLE_ID: "com.smithheffa.paygate"
@@ -29,6 +31,22 @@ workflows:
         script: npm run cap:sync:ios
       - name: Configure App Store signing
         script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Diagnose iOS signing
+        script: |
+          echo "=== Installed provisioning profiles ==="
+          find "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            -maxdepth 1 \
+            -type f \
+            -name "*.mobileprovision" \
+            -print || true
+
+          echo "=== Xcode Release signing settings ==="
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -showBuildSettings | \
+            egrep "PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER" || true
       - name: Set display name
         script: |
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" ios/App/App/Info.plist
