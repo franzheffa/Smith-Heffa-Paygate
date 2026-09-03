@@ -30,19 +30,63 @@ workflows:
       - name: Sync Capacitor iOS shell
         script: npm run cap:sync:ios
       - name: Configure App Store signing
-        script: xcode-project use-profiles --project ios/App/App.xcodeproj
-      - name: Diagnose iOS signing
         script: |
-          echo "=== Installed provisioning profiles ==="
-          find "$HOME/Library/MobileDevice/Provisioning Profiles" \
+          set -e
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          echo "=== Provisioning profile directory ==="
+          echo "$PROFILE_DIR"
+
+          echo "=== Provisioning profile files ==="
+          find "$PROFILE_DIR" \
             -maxdepth 1 \
             -type f \
             -name "*.mobileprovision" \
             -print || true
 
+          PROFILE_COUNT="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | wc -l | tr -d ' ')"
+
+          echo "Provisioning profile count: $PROFILE_COUNT"
+
+          if [ "$PROFILE_COUNT" -eq 0 ]; then
+            echo "ERROR: No provisioning profile was installed by Codemagic."
+            exit 1
+          fi
+
+          if [ "$PROFILE_COUNT" -ne 1 ]; then
+            echo "ERROR: Expected exactly one provisioning profile, found $PROFILE_COUNT."
+            exit 1
+          fi
+
+          PROFILE_PATH="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | head -n 1)"
+
+          echo "Using provisioning profile file:"
+          echo "$PROFILE_PATH"
+
+          xcode-project use-profiles \
+            --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
+            --profile "$PROFILE_PATH"
+      - name: Diagnose provisioning profile
+        script: |
+          set -e
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PATH="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | head -n 1)"
+
+          echo "=== Profile metadata ==="
+
+          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
+
+          /usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist || true
+          /usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist || true
+          /usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist || true
+          /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist || true
+          /usr/libexec/PlistBuddy -c "Print :ExpirationDate" /tmp/profile.plist || true
+
           echo "=== Xcode Release signing settings ==="
           xcodebuild \
-            -project ios/App/App.xcodeproj \
+            -project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
             -scheme App \
             -configuration Release \
             -showBuildSettings | \
