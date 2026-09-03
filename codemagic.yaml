@@ -2,66 +2,62 @@ workflows:
   ios-release:
     name: Smith-Heffa Paygate iOS Release
     max_build_duration: 60
+    integrations:
+      app_store_connect: SMITH_HEFFA_PAYGATE_CODEMAGIC
     environment:
       xcode: latest
       node: 22.19.0
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.smithheffa.paygate
       vars:
         APP_NAME: "Smith-Heffa Paygate"
-        BUNDLE_ID: "ca.smithheffa.paygate"
+        BUNDLE_ID: "com.smithheffa.paygate"
+        APP_STORE_APPLE_ID: "6808069050"
+        APPLE_TEAM_ID: "Z7LNP6ARXT"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
     cache:
       cache_paths:
         - ~/.npm
-        - ~/Library/Caches/CocoaPods
+        - ~/Library/Caches/org.swift.swiftpm
+        - ~/Library/Developer/Xcode/DerivedData/SourcePackages
     scripts:
       - name: Install JavaScript dependencies
         script: npm ci
       - name: Sync Capacitor iOS shell
         script: npm run cap:sync:ios
-      - name: Set bundle identifier
+      - name: Configure App Store signing
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Set display name
         script: |
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" ios/App/App/Info.plist
-      - name: Build unsigned IPA
+      - name: Set monotonic build number
         script: |
-          xcodebuild \
-            -project ios/App/App.xcodeproj \
-            -scheme App \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
-            archive
-      - name: Export IPA
+          if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+            LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || true)"
+          fi
+          if [ -n "${LATEST_BUILD_NUMBER:-}" ]; then
+            NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          else
+            NEXT_BUILD_NUMBER="$BUILD_NUMBER"
+          fi
+          xcrun agvtool new-version -all "$NEXT_BUILD_NUMBER"
+      - name: Build signed IPA
         script: |
-          mkdir -p $CM_BUILD_DIR/build/export
-          cat > $CM_BUILD_DIR/build/export/ExportOptions.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>teamID</key>
-            <string>${APP_STORE_CONNECT_TEAM_ID}</string>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild \
-            -exportArchive \
-            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
-            -exportPath $CM_BUILD_DIR/build/export \
-            -exportOptionsPlist $CM_BUILD_DIR/build/export/ExportOptions.plist
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --archive-flags "-clonedSourcePackagesDirPath $CM_BUILD_DIR/SourcePackages" \
+            --archive-xcargs "COMPILATION_CACHE_ENABLE_CACHING=True"
     artifacts:
-      - build/export/*.ipa
-      - build/App.xcarchive
+      - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        submit_to_testflight: false
+        submit_to_app_store: false
   android-release:
     name: Smith-Heffa Paygate Android Release
     max_build_duration: 60
