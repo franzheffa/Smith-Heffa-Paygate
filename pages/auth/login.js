@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
+import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 const COUNTRIES = {
   CM: { name: '🇨🇲 Cameroun',    prefix: '+237', example: '6XX XXX XXX' },
@@ -129,6 +130,10 @@ export default function AuthLogin() {
                   </div>
                   <span style={{ fontWeight: '800', color: '#fff', backgroundColor: '#09090b', padding: '8px 16px', borderRadius: '12px' }}>Connecter</span>
                 </button>
+
+                <div style={{ padding: '18px', border: '2px solid #e5e7eb', backgroundColor: '#fafafa', borderRadius: '16px' }}>
+                  <GoogleSignInButton />
+                </div>
               </div>
             )}
 
