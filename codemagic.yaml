@@ -31,24 +31,26 @@ workflows:
         script: npm run cap:sync:ios
       - name: Configure App Store signing
         script: |
-          set -e
+          set -euo pipefail
 
           echo "=== Codemagic CLI version ==="
           xcode-project --version || true
 
-          echo "=== Provisioning profiles - modern Xcode path ==="
+          echo "=== Modern Xcode provisioning profiles ==="
           find "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
             -maxdepth 1 \
             -type f \
             \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
             -print 2>/dev/null || true
 
-          echo "=== Provisioning profiles - legacy path ==="
+          echo "=== Legacy provisioning profiles ==="
           find "$HOME/Library/MobileDevice/Provisioning Profiles" \
             -maxdepth 1 \
             -type f \
             \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
             -print 2>/dev/null || true
+
+          echo "=== Apply profiles to App.xcodeproj ==="
 
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
@@ -66,9 +68,11 @@ workflows:
             -showBuildSettings | \
             egrep "PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER" || true
 
-          echo "=== Generated export options ==="
+          echo "=== Export options ==="
           if [ -f "$HOME/export_options.plist" ]; then
-            /usr/libexec/PlistBuddy -c "Print" "$HOME/export_options.plist" || true
+            /usr/libexec/PlistBuddy -c "Print :method" "$HOME/export_options.plist" || true
+            /usr/libexec/PlistBuddy -c "Print :signingStyle" "$HOME/export_options.plist" || true
+            /usr/libexec/PlistBuddy -c "Print :provisioningProfiles" "$HOME/export_options.plist" || true
           else
             echo "NO_EXPORT_OPTIONS_PLIST"
           fi
