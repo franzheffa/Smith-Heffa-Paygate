@@ -1,0 +1,202 @@
+workflows:
+  ios-release:
+    name: Smith-Heffa Paygate iOS Release
+    max_build_duration: 60
+    integrations:
+      app_store_connect: SMITH_HEFFA_PAYGATE_CODEMAGIC
+    environment:
+      xcode: latest
+      node: 22.19.0
+      ios_signing:
+        provisioning_profiles:
+          - SMITH_HEFFA_PAYGATE_APPSTORE_PROFILE_20260903
+        certificates:
+          - SMITH_HEFFA_PAYGATE_DISTRIBUTION
+      vars:
+        APP_NAME: "Smith-Heffa Paygate"
+        BUNDLE_ID: "com.smithheffa.paygate"
+        APP_STORE_APPLE_ID: "6808069050"
+        APPLE_TEAM_ID: "Z7LNP6ARXT"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/Library/Caches/org.swift.swiftpm
+        - ~/Library/Developer/Xcode/DerivedData/SourcePackages
+    scripts:
+      - name: Install JavaScript dependencies
+        script: npm ci
+      - name: Sync Capacitor iOS shell
+        script: npm run cap:sync:ios
+      - name: Configure App Store signing
+        script: |
+          set -euo pipefail
+
+          echo "=== Codemagic CLI version ==="
+          xcode-project --version || true
+
+          echo "=== Modern Xcode provisioning profiles ==="
+          find "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
+            -print 2>/dev/null || true
+
+          echo "=== Legacy provisioning profiles ==="
+          find "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
+            -print 2>/dev/null || true
+
+          echo "=== Apply profiles to App.xcodeproj ==="
+
+          cp "$CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj" \
+            /tmp/project-before-signing.pbxproj
+
+          xcode-project use-profiles \
+            --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
+            --archive-method app-store \
+            --code-signing-setup-verbose-logging
+
+          echo "=== Signing diff produced by use-profiles ==="
+          git diff --no-index \
+            /tmp/project-before-signing.pbxproj \
+            "$CM_BUILD_DIR/ios/App/App.xcodeproj/project.pbxproj" \
+            | egrep "CODE_SIGN|PROVISIONING_PROFILE|DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|^[+-]" \
+            || true
+      - name: Diagnose provisioning profile
+        script: |
+          set -e
+
+          echo "=== Installed provisioning profiles ==="
+          MATCHING_PROFILE_FOUND=NO
+          MATCHING_PROFILE_NAME=""
+          MATCHING_PROFILE_UUID=""
+
+          for PROFILE in \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"/*.provisionprofile
+          do
+            [ -f "$PROFILE" ] || continue
+            security cms -D -i "$PROFILE" > /tmp/profile.plist
+
+            PROFILE_NAME="$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_UUID="$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)"
+            PROFILE_EXPIRATION="$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" /tmp/profile.plist 2>/dev/null || true)"
+
+            echo "Name: $PROFILE_NAME"
+            echo "UUID: $PROFILE_UUID"
+            echo "TeamIdentifier:0: $PROFILE_TEAM"
+            echo "Entitlements:application-identifier: $PROFILE_APP_ID"
+            echo "ExpirationDate: $PROFILE_EXPIRATION"
+
+            if [ "$PROFILE_TEAM" = "$APPLE_TEAM_ID" ] && \
+              [ "$PROFILE_APP_ID" = "$APPLE_TEAM_ID.$BUNDLE_ID" ]; then
+              MATCHING_PROFILE_FOUND=YES
+              MATCHING_PROFILE_NAME="$PROFILE_NAME"
+              MATCHING_PROFILE_UUID="$PROFILE_UUID"
+            fi
+          done
+
+          echo "MATCHING_PROFILE_FOUND: $MATCHING_PROFILE_FOUND"
+          echo "MATCHING_PROFILE_NAME: $MATCHING_PROFILE_NAME"
+          echo "MATCHING_PROFILE_UUID: $MATCHING_PROFILE_UUID"
+
+          echo "=== Available code-signing identities ==="
+          SIGNING_IDENTITIES="$(security find-identity -v -p codesigning || true)"
+          printf '%s\n' "$SIGNING_IDENTITIES"
+          if printf '%s\n' "$SIGNING_IDENTITIES" | grep -q "Apple Distribution:"; then
+            echo "SIGNING_IDENTITY_AVAILABLE: YES"
+          else
+            echo "SIGNING_IDENTITY_AVAILABLE: NO"
+          fi
+
+          echo "=== Xcode Release signing settings after use-profiles ==="
+          xcodebuild \
+            -project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
+            -scheme App \
+            -configuration Release \
+            -showBuildSettings | \
+            egrep "TARGET_NAME|PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_ENTITLEMENTS" || true
+
+          echo "=== Export options ==="
+          if [ -f "$HOME/export_options.plist" ]; then
+            echo "EXPORT_OPTIONS_PRESENT: YES"
+            echo "EXPORT_METHOD: $(/usr/libexec/PlistBuddy -c "Print :method" "$HOME/export_options.plist" 2>/dev/null || true)"
+            echo "EXPORT_SIGNING_STYLE: $(/usr/libexec/PlistBuddy -c "Print :signingStyle" "$HOME/export_options.plist" 2>/dev/null || true)"
+            echo "EXPORT_PROFILE_MAPPING:"
+            /usr/libexec/PlistBuddy -c "Print :provisioningProfiles" "$HOME/export_options.plist" || true
+          else
+            echo "EXPORT_OPTIONS_PRESENT: NO"
+            echo "NO_EXPORT_OPTIONS_PLIST"
+          fi
+      - name: Set display name
+        script: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" ios/App/App/Info.plist
+      - name: Set monotonic build number
+        script: |
+          if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+            LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || true)"
+          fi
+
+          if [ -n "${LATEST_BUILD_NUMBER:-}" ]; then
+            NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          else
+            NEXT_BUILD_NUMBER="$BUILD_NUMBER"
+          fi
+
+          echo "Using iOS build number: $NEXT_BUILD_NUMBER"
+
+          cd "$CM_BUILD_DIR/ios/App"
+          xcrun agvtool new-version -all "$NEXT_BUILD_NUMBER"
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --archive-flags "-clonedSourcePackagesDirPath $CM_BUILD_DIR/SourcePackages" \
+            --archive-xcargs "COMPILATION_CACHE_ENABLE_CACHING=True"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
+  android-release:
+    name: Smith-Heffa Paygate Android Release
+    max_build_duration: 60
+    environment:
+      java: 17
+      node: 22.19.0
+      vars:
+        APP_NAME: "Smith-Heffa Paygate"
+        APPLICATION_ID: "com.smithheffa.paygate"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+    scripts:
+      - name: Install JavaScript dependencies
+        script: npm ci
+      - name: Sync Capacitor Android shell
+        script: npm run cap:sync:android
+      - name: Build Android App Bundle
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal

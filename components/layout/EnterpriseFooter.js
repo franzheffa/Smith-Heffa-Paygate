@@ -81,6 +81,14 @@ export default function EnterpriseFooter() {
             © 2026 Smith-Heffa Paygate · Buttertech Inc.
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <a href="/support" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Support</a>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>·</span>
+            <a href="/legal/privacy" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Privacy</a>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>·</span>
+            <a href="/legal/terms" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Terms</a>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>·</span>
+            <a href="/account/delete" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Delete account</a>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>·</span>
             <span style={{ fontSize: '10px', fontWeight: '600', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Protected by</span>
             {secOpsBadge}
           </div>

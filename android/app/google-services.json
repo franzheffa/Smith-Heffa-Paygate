@@ -1,0 +1,70 @@
+{
+  "project_info": {
+    "project_number": "228124388837",
+    "project_id": "smith-heffa-paygate-mobile",
+    "storage_bucket": "smith-heffa-paygate-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:228124388837:android:9a76faed012045b07fd30c",
+        "android_client_info": {
+          "package_name": "com.smithheffa.paygate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "228124388837-0ssr79as6suqau3kbfpf72i4e0ttqpjr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smithheffa.paygate",
+            "certificate_hash": "f2172a295e0f348046e652b213013507d2581d4e"
+          }
+        },
+        {
+          "client_id": "228124388837-4i5hti5ph7ihtkiueft3gseo7qjs672r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smithheffa.paygate",
+            "certificate_hash": "dbcb9d71a7d31a7283b4380f0b8797df7493f93b"
+          }
+        },
+        {
+          "client_id": "228124388837-78o8c68bfpf670iq8ucldj8hcbg00252.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smithheffa.paygate",
+            "certificate_hash": "45fcaaf9882d860a73751475e29edb9a651b6690"
+          }
+        },
+        {
+          "client_id": "228124388837-fjnag3tubdrb4bsf8gbums0s7l93r91u.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGEWdCVsxCMhGo93LH_kD6F8wCP6j_Ito"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "228124388837-fjnag3tubdrb4bsf8gbums0s7l93r91u.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "228124388837-nqf41b4ta2h8q5s32ha1jvho4palj2te.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.smithheffa.paygate"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

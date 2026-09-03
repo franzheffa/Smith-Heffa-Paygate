@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.smithheffa.paygate",
+      "sha256_cert_fingerprints": [
+        "6C:89:D3:EE:4A:9F:6C:71:96:43:EF:66:67:24:EE:37:75:8C:72:27:90:89:F7:50:BA:AA:26:C6:34:7B:E8:8A"
+      ]
+    }
+  }
+]

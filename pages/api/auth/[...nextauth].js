@@ -50,7 +50,7 @@ if (appleEnabled) {
   );
 }
 
-export default NextAuth({
+export const authOptions = {
   providers,
   secret: authSecret,
   session: {
@@ -80,4 +80,6 @@ export default NextAuth({
       return session;
     },
   },
-});
+};
+
+export default NextAuth(authOptions);

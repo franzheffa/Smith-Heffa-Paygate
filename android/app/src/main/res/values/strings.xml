@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Smith-Heffa Paygate</string>
+    <string name="title_activity_main">Smith-Heffa Paygate</string>
+    <string name="package_name">ca.smithheffa.paygate</string>
+    <string name="custom_url_scheme">ca.smithheffa.paygate</string>
+</resources>

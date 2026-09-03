@@ -7,7 +7,7 @@ info:
     This document implements a constrained subset of FDX-style meta and consent endpoints
     for readiness, integration, and enterprise deployment workflows.
 servers:
-  - url: https://smith-heffa-paygate.vercel.app/api/fdx/v6
+  - url: https://smith-heffa-paygate.ca/api/fdx/v6
     description: Production
 tags:
   - name: Meta
