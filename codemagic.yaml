@@ -33,64 +33,45 @@ workflows:
         script: |
           set -e
 
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "=== Codemagic CLI version ==="
+          xcode-project --version || true
 
-          echo "=== Provisioning profile directory ==="
-          echo "$PROFILE_DIR"
-
-          echo "=== Provisioning profile files ==="
-          find "$PROFILE_DIR" \
+          echo "=== Provisioning profiles - modern Xcode path ==="
+          find "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
             -maxdepth 1 \
             -type f \
-            -name "*.mobileprovision" \
-            -print || true
+            \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
+            -print 2>/dev/null || true
 
-          PROFILE_COUNT="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | wc -l | tr -d ' ')"
-
-          echo "Provisioning profile count: $PROFILE_COUNT"
-
-          if [ "$PROFILE_COUNT" -eq 0 ]; then
-            echo "ERROR: No provisioning profile was installed by Codemagic."
-            exit 1
-          fi
-
-          if [ "$PROFILE_COUNT" -ne 1 ]; then
-            echo "ERROR: Expected exactly one provisioning profile, found $PROFILE_COUNT."
-            exit 1
-          fi
-
-          PROFILE_PATH="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | head -n 1)"
-
-          echo "Using provisioning profile file:"
-          echo "$PROFILE_PATH"
+          echo "=== Provisioning profiles - legacy path ==="
+          find "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) \
+            -print 2>/dev/null || true
 
           xcode-project use-profiles \
             --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
-            --profile "$PROFILE_PATH"
+            --archive-method app-store \
+            --code-signing-setup-verbose-logging
       - name: Diagnose provisioning profile
         script: |
           set -e
 
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_PATH="$(find "$PROFILE_DIR" -maxdepth 1 -type f -name "*.mobileprovision" | head -n 1)"
-
-          echo "=== Profile metadata ==="
-
-          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
-
-          /usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist || true
-          /usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist || true
-          /usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" /tmp/profile.plist || true
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist || true
-          /usr/libexec/PlistBuddy -c "Print :ExpirationDate" /tmp/profile.plist || true
-
-          echo "=== Xcode Release signing settings ==="
+          echo "=== Xcode Release signing settings after use-profiles ==="
           xcodebuild \
             -project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
             -scheme App \
             -configuration Release \
             -showBuildSettings | \
             egrep "PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|PROVISIONING_PROFILE|PROVISIONING_PROFILE_SPECIFIER" || true
+
+          echo "=== Generated export options ==="
+          if [ -f "$HOME/export_options.plist" ]; then
+            /usr/libexec/PlistBuddy -c "Print" "$HOME/export_options.plist" || true
+          else
+            echo "NO_EXPORT_OPTIONS_PLIST"
+          fi
       - name: Set display name
         script: |
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_NAME}" ios/App/App/Info.plist
