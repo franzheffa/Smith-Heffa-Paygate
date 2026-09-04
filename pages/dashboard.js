@@ -1348,6 +1348,11 @@ function UniversalCheckoutForm({ onTracked }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (form.useCase === 'FLIGHT') {
+      // Flight inventory, offer selection, and travel context are owned by the Duffel flow.
+      window.location.href = '/travel?checkout=universal';
+      return;
+    }
     setLoading(true);
     setResult(null);
     try {
@@ -1423,6 +1428,11 @@ function UniversalCheckoutForm({ onTracked }) {
       <input type="tel" value={form.customerPhone} onChange={(e) => update('customerPhone', e.target.value)} placeholder="Téléphone client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
       <input type="email" value={form.customerEmail} onChange={(e) => update('customerEmail', e.target.value)} placeholder="Email client (optionnel)" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
       <input type="text" value={form.description} onChange={(e) => update('description', e.target.value)} placeholder="Description métier" style={{ height: '42px', borderRadius: '10px', border: '1.5px solid #e5e7eb', padding: '0 12px', fontSize: '14px' }} />
+      {form.useCase === 'FLIGHT' ? (
+        <div style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#1d4ed8', fontSize: '12px' }}>
+          Flight uses the Duffel search flow. Your selected offer and itinerary will be attached when Universal Checkout is prepared.
+        </div>
+      ) : null}
       {result && (
         <div style={{ padding: '10px 12px', borderRadius: '10px', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, backgroundColor: result.ok ? '#f0fdf4' : '#fef2f2', color: result.ok ? '#166534' : '#991b1b', fontSize: '12px', display: 'grid', gap: '4px' }}>
           <div><strong>{result.ok ? 'Checkout routé' : 'Erreur checkout'}</strong></div>
@@ -1434,7 +1444,7 @@ function UniversalCheckoutForm({ onTracked }) {
         </div>
       )}
       <button type="submit" disabled={loading} style={{ height: '46px', borderRadius: '10px', backgroundColor: loading ? '#6b7280' : BLACK, color: GOLD, border: 'none', fontWeight: '800', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer' }}>
-        {loading ? '⏳ Routage...' : 'Préparer le checkout Smith-Heffa'}
+        {form.useCase === 'FLIGHT' ? 'Rechercher des vols Duffel' : loading ? '⏳ Routage...' : 'Préparer le checkout Smith-Heffa'}
       </button>
     </form>
   );
@@ -1755,6 +1765,21 @@ export default function Dashboard() {
               <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>Console d'orchestration unifiée · 9 rails de paiement</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <a
+                href="/travel"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  color: '#d4b26a',
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  border: '1px solid rgba(212,178,106,0.45)',
+                  textDecoration: 'none'
+                }}
+              >
+                Flights &amp; Travel
+              </a>
               <a
                 href="/account/delete"
                 style={{
