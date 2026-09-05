@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,8 +7,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseProperties = Properties()
+val releasePropertiesFile = rootProject.file("key.properties")
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.inputStream().use(releaseProperties::load)
+}
+
 android {
-    namespace = "io.buttertech.smith_heffa_paygate_mobile_rebuilt"
+    namespace = "com.smithheffa.paygate"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,8 +28,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "io.buttertech.smith_heffa_paygate_mobile_rebuilt"
+        applicationId = "com.smithheffa.paygate"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -32,9 +39,15 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Production signing is supplied only by the existing CI secret group.
+            if (releasePropertiesFile.exists()) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = releaseProperties["storeFile"]?.let(::file)
+                    storePassword = releaseProperties["storePassword"] as String?
+                    keyAlias = releaseProperties["keyAlias"] as String?
+                    keyPassword = releaseProperties["keyPassword"] as String?
+                }
+            }
         }
     }
 }

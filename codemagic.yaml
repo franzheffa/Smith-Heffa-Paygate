@@ -1,0 +1,68 @@
+workflows:
+  smith-heffa-validation:
+    name: Smith-Heffa Flutter validation
+    max_build_duration: 60
+    scripts:
+      - name: Validate Flutter source
+        script: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build web --release
+      - name: Scan tracked source for secrets
+        script: |
+          if rg -l -i 'DUFFEL_API_TOKEN\s*[:=]|DUFFEL_ACCESS_TOKEN\s*[:=]|STRIPE_SECRET\s*[:=]|PAWAPAY.*(TOKEN|SECRET|API)\s*[:=]|NEXTAUTH_SECRET\s*[:=]|DATABASE_URL\s*[:=]|BEGIN [A-Z ]*PRIVATE KEY|client_secret\s*[:=]' --glob '!build/**' --glob '!.dart_tool/**' .; then
+            exit 1
+          fi
+
+  smith-heffa-ios-release:
+    name: Smith-Heffa iOS release (manual gate)
+    max_build_duration: 90
+    integrations:
+      app_store_connect: SMITH_HEFFA_PAYGATE_CODEMAGIC
+    environment:
+      groups:
+        - SMITH_HEFFA_PAYGATE_CODEMAGIC
+      vars:
+        BUNDLE_ID: com.smithheffa.paygate
+        IOS_BUILD_NAME: '1.0'
+        IOS_BUILD_NUMBER: '10'
+    scripts:
+      - name: Require explicit release authorization
+        script: |
+          test "$SH_IOS_BUILD_AUTHORIZED" = "true" || { echo 'iOS build is held pending explicit authorization.'; exit 1; }
+      - name: Validate and build signed IPA
+        script: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build ipa --release --build-name="$IOS_BUILD_NAME" --build-number="$IOS_BUILD_NUMBER"
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+  smith-heffa-android-release:
+    name: Smith-Heffa Android release (manual gate)
+    max_build_duration: 60
+    environment:
+      groups:
+        - SMITH_HEFFA_PAYGATE_CODEMAGIC
+      vars:
+        ANDROID_BUILD_NAME: '1.0'
+        ANDROID_BUILD_NUMBER: '10'
+    scripts:
+      - name: Require explicit release authorization
+        script: |
+          test "$SH_ANDROID_BUILD_AUTHORIZED" = "true" || { echo 'Android build is held pending explicit authorization.'; exit 1; }
+      - name: Materialize existing CI signing reference
+        script: |
+          test -n "$CM_KEYSTORE" && test -n "$CM_KEYSTORE_PASSWORD" && test -n "$CM_KEY_ALIAS" && test -n "$CM_KEY_PASSWORD" || { echo 'Existing Android upload signing secrets are required.'; exit 1; }
+          keytool -importkeystore -srckeystore "$CM_KEYSTORE" -srcstorepass "$CM_KEYSTORE_PASSWORD" -destkeystore android/app/upload-keystore.jks -deststorepass "$CM_KEYSTORE_PASSWORD" -destkeypass "$CM_KEY_PASSWORD" -noprompt
+          printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$CM_KEYSTORE_PASSWORD" "$CM_KEY_ALIAS" "$CM_KEY_PASSWORD" > android/key.properties
+      - name: Validate and build release AAB
+        script: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build appbundle --release --build-name="$ANDROID_BUILD_NAME" --build-number="$ANDROID_BUILD_NUMBER"
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab

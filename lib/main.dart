@@ -275,7 +275,7 @@ class _TravelPageState extends State<TravelPage> {
 
   List<FlightOffer> get _sortedOffers {
     final values = [..._offers];
-    if (_sort == 'lowest') values.sort((a, b) => a.amount.compareTo(b.amount));
+    if (_sort == 'lowest') values.sort((a, b) => a.sortMinorUnits.compareTo(b.sortMinorUnits));
     if (_sort == 'shortest') values.sort((a, b) => a.duration.compareTo(b.duration));
     if (_sort == 'earliest') values.sort((a, b) => (a.departureAt ?? DateTime(9999)).compareTo(b.departureAt ?? DateTime(9999)));
     return values;
@@ -351,7 +351,7 @@ class FlightOfferCard extends StatelessWidget {
   String _time(DateTime? value) => value == null ? '--:--' : '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
   @override
   Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Expanded(child: Text(offer.airline, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))), Text('${offer.amount.toStringAsFixed(2)} ${offer.currency}', style: const TextStyle(fontWeight: FontWeight.w800))]),
+        Row(children: [Expanded(child: Text(offer.airline, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))), Text('${offer.providerFare} ${offer.currency}', style: const TextStyle(fontWeight: FontWeight.w800))]),
         const SizedBox(height: 10), Text('${offer.route}  ${_time(offer.departureAt)} - ${_time(offer.arrivalAt)}'),
         Text('${offer.duration.inHours}h ${offer.duration.inMinutes.remainder(60).toString().padLeft(2, '0')} · ${offer.stops == 0 ? 'Direct' : '${offer.stops} escale${offer.stops > 1 ? 's' : ''}'}', style: const TextStyle(color: Color(0xff5d5d65))),
         if (offer.expiresAt != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Offre valable jusqu a ${_time(offer.expiresAt)}', style: const TextStyle(fontSize: 12, color: Color(0xff8c6100)))),
@@ -384,7 +384,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   }
   @override
   Widget build(BuildContext context) => SafeArea(child: Padding(padding: const EdgeInsets.all(20), child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Universal Checkout', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)), const SizedBox(height: 8), Text('${widget.offer.airline} · ${widget.offer.amount.toStringAsFixed(2)} ${widget.offer.currency}'),
+        const Text('Universal Checkout', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)), const SizedBox(height: 8), Text('${widget.offer.airline} · ${widget.offer.providerFare} ${widget.offer.currency}'),
         const SizedBox(height: 12), const Notice('Preparation uniquement', 'Le serveur relit l offre et son prix. Aucun paiement, passager ou ordre n est cree.'), const SizedBox(height: 12),
         ...widget.capabilities.map((rail) => ListTile(
               contentPadding: EdgeInsets.zero,
@@ -395,9 +395,42 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
             )),
         if (!widget.capabilities.any((rail) => rail.available)) const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Aucun rail de paiement n est confirme par le backend. Aucun checkout ne peut etre initie.', style: TextStyle(color: Color(0xff8c6100)))),
         SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading || _rail == null ? null : _prepare, child: Text(_loading ? 'Revalidation...' : 'Revalider et preparer'))),
-        if (_checkout != null) Padding(padding: const EdgeInsets.only(top: 12), child: TravelStateNotice(state: TravelState.success, message: 'CHECKOUT_CREATED · ${_checkout!.amount} ${_checkout!.currency} · execution paiement et booking desactivee.')),
+        if (_checkout?.pricing case final pricing?) ...[
+          const SizedBox(height: 12),
+          PriceBreakdown(pricing: pricing),
+          const SizedBox(height: 8),
+          TravelStateNotice(state: TravelState.success, message: 'CHECKOUT_CREATED · ${_checkout!.amount} ${_checkout!.currency} · execution paiement et booking desactivee.'),
+        ],
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: TravelStateNotice(state: TravelState.error, message: _error!)),
       ]))));
+}
+
+class PriceBreakdown extends StatelessWidget {
+  const PriceBreakdown({super.key, required this.pricing});
+  final PricingSnapshot pricing;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Recapitulatif du prix', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            _row('Tarif du vol', pricing.providerFare, pricing.currency),
+            _row('Frais de billetterie Smith-Heffa', pricing.fixedTicketingFee, pricing.currency),
+            if (pricing.railFee != '0' && pricing.railFee != '0.00') _row('Frais Mobile Money', pricing.railFee, pricing.currency),
+            const Divider(),
+            _row('Total', pricing.total, pricing.currency, bold: true),
+            const SizedBox(height: 6),
+            Text('${pricing.ticketCount} billet(s) · ${pricing.version}', style: const TextStyle(fontSize: 12, color: Color(0xff5d5d65))),
+          ]),
+        ),
+      );
+
+  Widget _row(String label, String amount, String currency, {bool bold = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [Expanded(child: Text(label)), Text('$amount $currency', style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w500))]),
+      );
 }
 
 enum TravelState { initial, loading, success, empty, error, offline }

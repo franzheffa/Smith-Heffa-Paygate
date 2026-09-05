@@ -1,4 +1,4 @@
-package io.buttertech.smith_heffa_paygate_mobile_rebuilt
+package com.smithheffa.paygate
 
 import io.flutter.embedding.android.FlutterActivity
 

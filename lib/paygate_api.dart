@@ -35,7 +35,7 @@ class FlightOffer {
   const FlightOffer({
     required this.id,
     required this.airline,
-    required this.amount,
+    required this.providerFare,
     required this.currency,
     required this.duration,
     required this.stops,
@@ -47,7 +47,7 @@ class FlightOffer {
 
   final String id;
   final String airline;
-  final double amount;
+  final String providerFare;
   final String currency;
   final Duration duration;
   final int stops;
@@ -72,7 +72,7 @@ class FlightOffer {
     return FlightOffer(
       id: json['id'] as String? ?? '',
       airline: carrier,
-      amount: double.tryParse(json['total_amount']?.toString() ?? '') ?? double.infinity,
+      providerFare: json['total_amount']?.toString() ?? '',
       currency: json['total_currency'] as String? ?? '',
       duration: duration,
       stops: (summary['connections'] as num?)?.toInt() ?? (segments.length - 1).clamp(0, 99).toInt(),
@@ -81,6 +81,14 @@ class FlightOffer {
       expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? ''),
       route: '$origin -> $destination',
     );
+  }
+
+  // Used only to order provider results; checkout totals remain server-authoritative.
+  int get sortMinorUnits {
+    final parts = providerFare.split('.');
+    final whole = int.tryParse(parts.first) ?? 1 << 62;
+    final fraction = parts.length > 1 ? int.tryParse('${parts[1]}00'.substring(0, 2)) ?? 0 : 0;
+    return whole * 100 + fraction;
   }
 
   static Duration _duration(String iso) {
@@ -105,20 +113,44 @@ class RailCapability {
 }
 
 class CheckoutPreview {
-  const CheckoutPreview({required this.checkoutId, required this.amount, required this.currency, required this.expiresAt, required this.rail});
+  const CheckoutPreview({required this.checkoutId, required this.amount, required this.currency, required this.expiresAt, required this.rail, required this.pricing});
 
   final String checkoutId;
   final String amount;
   final String currency;
   final DateTime? expiresAt;
   final String rail;
+  final PricingSnapshot? pricing;
 
   factory CheckoutPreview.fromJson(Map<String, dynamic> json) => CheckoutPreview(
         checkoutId: json['checkoutId'] as String? ?? '',
         amount: json['amount']?.toString() ?? '',
         currency: json['currency'] as String? ?? '',
         expiresAt: DateTime.tryParse(json['expiresAt'] as String? ?? ''),
-        rail: json['rail'] as String? ?? '',
+      rail: json['rail'] as String? ?? '',
+      pricing: json['pricing'] is Map ? PricingSnapshot.fromJson(Map<String, dynamic>.from(json['pricing'] as Map)) : null,
+      );
+}
+
+class PricingSnapshot {
+  const PricingSnapshot({required this.version, required this.providerFare, required this.fixedTicketingFee, required this.railFee, required this.total, required this.currency, required this.ticketCount});
+
+  final String version;
+  final String providerFare;
+  final String fixedTicketingFee;
+  final String railFee;
+  final String total;
+  final String currency;
+  final int ticketCount;
+
+  factory PricingSnapshot.fromJson(Map<String, dynamic> json) => PricingSnapshot(
+        version: json['pricingVersion'] as String? ?? '',
+        providerFare: json['providerFare']?.toString() ?? '',
+        fixedTicketingFee: json['fixedTicketingFee']?.toString() ?? '',
+        railFee: json['railFee']?.toString() ?? '',
+        total: json['total']?.toString() ?? '',
+        currency: json['currency'] as String? ?? '',
+        ticketCount: (json['ticketCount'] as num?)?.toInt() ?? 0,
       );
 }
 
