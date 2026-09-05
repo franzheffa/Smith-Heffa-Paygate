@@ -4,6 +4,7 @@ import {
   duffelFetch,
   requireDuffelConfig,
 } from '../../../lib/duffel';
+import { handleMobileReadCors } from '../../../lib/mobile-api';
 
 function normalizeSlices(rawSlices = []) {
   return rawSlices
@@ -89,8 +90,9 @@ function enrichOffer(offer, preferredAirline) {
 }
 
 export default async function handler(req, res) {
+  if (handleMobileReadCors(req, res, 'POST')) return;
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 

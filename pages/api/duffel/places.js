@@ -1,8 +1,10 @@
 import { duffelFetch, requireDuffelConfig } from '../../../lib/duffel';
+import { handleMobileReadCors } from '../../../lib/mobile-api';
 
 export default async function handler(req, res) {
+  if (handleMobileReadCors(req, res)) return;
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
+    res.setHeader('Allow', 'GET, OPTIONS');
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
