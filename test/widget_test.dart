@@ -9,10 +9,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:smith_heffa_paygate_mobile_rebuilt/main.dart';
+import 'package:smith_heffa_paygate_mobile_rebuilt/auth_session.dart';
+
+class FakeAuthSession extends AuthSessionSource {
+  FakeAuthSession(this.status, [this.user]);
+  @override
+  AuthStatus status;
+  @override
+  AppUser? user;
+  @override
+  String? message;
+  int signOutCalls = 0;
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<void> signInWithGoogle() async {}
+  @override
+  Future<void> signOut() async { signOutCalls++; status = AuthStatus.signedOut; user = null; notifyListeners(); }
+  void authenticate() { status = AuthStatus.authenticated; user = const AppUser(displayName: 'Test', email: 'test@example.invalid'); notifyListeners(); }
+}
+
+Widget testShell() => MobileShell(session: FakeAuthSession(AuthStatus.authenticated));
 
 void main() {
+  testWidgets('auth gate renders signed-out and authenticated states', (tester) async {
+    final signedOut = FakeAuthSession(AuthStatus.signedOut);
+    await tester.pumpWidget(PaygateApp(session: signedOut));
+    expect(find.text('Connexion securisee'), findsOneWidget);
+    expect(find.text('Accueil'), findsNothing);
+    signedOut.authenticate();
+    await tester.pump();
+    expect(find.text('Accueil'), findsWidgets);
+  });
+
+  testWidgets('logout returns auth gate to signed-out state', (tester) async {
+    final session = FakeAuthSession(AuthStatus.authenticated, const AppUser(displayName: 'Test', email: 'test@example.invalid'));
+    await tester.pumpWidget(PaygateApp(session: session));
+    await tester.tap(find.text('Compte'));
+    await tester.pump();
+    await tester.tap(find.text('Deconnexion'));
+    await tester.pump();
+    expect(session.signOutCalls, 1);
+    expect(find.text('Connexion securisee'), findsOneWidget);
+  });
   testWidgets('mobile shell exposes account and legal access', (WidgetTester tester) async {
-    await tester.pumpWidget(const PaygateApp());
+    await tester.pumpWidget(MaterialApp(home: testShell()));
     expect(find.text('Enterprise Payment Rail'), findsOneWidget);
     await tester.tap(find.text('Compte'));
     await tester.pump();
@@ -35,7 +76,7 @@ void main() {
 
     for (final viewport in viewports) {
       await tester.binding.setSurfaceSize(viewport);
-      await tester.pumpWidget(const PaygateApp());
+      await tester.pumpWidget(MaterialApp(home: testShell()));
       await tester.pump();
       await tester.scrollUntilVisible(find.text('Legal et Support'), 240);
       await tester.pump();
@@ -49,7 +90,7 @@ void main() {
   testWidgets('travel validates a safe local itinerary without provider access', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const PaygateApp());
+    await tester.pumpWidget(MaterialApp(home: testShell()));
     await tester.tap(find.text('Voyage'));
     await tester.pumpAndSettle();
 
@@ -64,7 +105,7 @@ void main() {
   });
 
   testWidgets('pay flow remains a local-only validation', (WidgetTester tester) async {
-    await tester.pumpWidget(const PaygateApp());
+    await tester.pumpWidget(MaterialApp(home: testShell()));
     await tester.tap(find.text('Payer'));
     await tester.pumpAndSettle();
 
@@ -77,7 +118,7 @@ void main() {
   });
 
   testWidgets('home quick actions navigate within the mobile shell', (WidgetTester tester) async {
-    await tester.pumpWidget(const PaygateApp());
+    await tester.pumpWidget(MaterialApp(home: testShell()));
     await tester.tap(find.text('Rechercher un vol'));
     await tester.pumpAndSettle();
 
@@ -95,9 +136,9 @@ void main() {
   testWidgets('account legal controls remain reachable with larger text', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(1.5)),
-      child: PaygateApp(),
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+      child: MaterialApp(home: testShell()),
     ));
     await tester.tap(find.text('Compte'));
     await tester.pump();

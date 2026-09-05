@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'auth_session.dart';
 import 'paygate_api.dart';
 
 const _ink = Color(0xff101114);
@@ -10,11 +11,33 @@ const _gold = Color(0xffc6a85b);
 
 void main() => runApp(const PaygateApp());
 
-class PaygateApp extends StatelessWidget {
-  const PaygateApp({super.key});
+class PaygateApp extends StatefulWidget {
+  const PaygateApp({super.key, this.session});
+  final AuthSessionSource? session;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  State<PaygateApp> createState() => _PaygateAppState();
+}
+
+class _PaygateAppState extends State<PaygateApp> {
+  late final AuthSessionSource _session = widget.session ?? AuthSession();
+
+  @override
+  void initState() {
+    super.initState();
+    _session.initialize();
+  }
+
+  @override
+  void dispose() {
+    if (widget.session == null) _session.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _session,
+        builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Smith-Heffa Paygate',
         theme: ThemeData(
@@ -22,12 +45,26 @@ class PaygateApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: _gold),
           scaffoldBackgroundColor: const Color(0xfff6f5f2),
         ),
-        home: const MobileShell(),
-      );
+        home: _session.status == AuthStatus.authenticated ? MobileShell(session: _session) : AuthPage(session: _session),
+      ));
+}
+
+class AuthPage extends StatelessWidget {
+  const AuthPage({super.key, required this.session});
+  final AuthSessionSource session;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    const BrandHero(), const SizedBox(height: 28), const Text('Connexion securisee', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)), const SizedBox(height: 10),
+    const Text('Connectez-vous pour associer votre session et vos checkouts a une identite verifiee.', textAlign: TextAlign.center), const SizedBox(height: 20),
+    FilledButton.icon(onPressed: session.status == AuthStatus.signingIn ? null : session.signInWithGoogle, icon: const Icon(Icons.login), label: Text(session.status == AuthStatus.signingIn ? 'Connexion...' : 'Continuer avec Google')),
+    if (session.message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(session.message!, textAlign: TextAlign.center)),
+  ]))))));
 }
 
 class MobileShell extends StatefulWidget {
-  const MobileShell({super.key});
+  const MobileShell({super.key, required this.session});
+  final AuthSessionSource session;
 
   @override
   State<MobileShell> createState() => _MobileShellState();
@@ -53,7 +90,7 @@ class _MobileShellState extends State<MobileShell> {
           const PayPage(),
           const TravelPage(),
           const ActivityPage(),
-          const AccountPage(),
+          AccountPage(session: widget.session),
         ][_index]),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
@@ -466,7 +503,7 @@ class TravelStateNotice extends StatelessWidget {
 class ActivityPage extends StatelessWidget {
   const ActivityPage({super.key});
   @override
-  Widget build(BuildContext context) => PageFrame(children: const [
+  Widget build(BuildContext context) => PageFrame(children: [
         SectionTitle('Activite'),
         InfoCard(title: 'AUTH_REQUIRED - activite indisponible', detail: 'Cette Preview ne fabrique ni transactions, ni soldes. Une session est necessaire avant toute lecture API autorisee.', icon: Icons.lock_outline),
         SectionTitle('Control Center'),
@@ -475,12 +512,14 @@ class ActivityPage extends StatelessWidget {
 }
 
 class AccountPage extends StatelessWidget {
-  const AccountPage({super.key});
+  const AccountPage({super.key, required this.session});
+  final AuthSessionSource session;
   @override
-  Widget build(BuildContext context) => PageFrame(children: const [
+  Widget build(BuildContext context) => PageFrame(children: [
         SectionTitle('Compte'),
-        InfoCard(title: 'Profil', detail: 'Aucun profil fictif n est affiche dans cette Preview.', icon: Icons.person_outline),
-        InfoCard(title: 'Securite et session', detail: 'La session de production reste protegee par cookies HttpOnly. Aucun etat connecte n est simule.', icon: Icons.shield_outlined),
+        InfoCard(title: 'Profil', detail: session.user?.displayName ?? 'Utilisateur authentifie', icon: Icons.person_outline),
+        InfoCard(title: 'Securite et session', detail: session.user?.email ?? 'Session Firebase authentifiee.', icon: Icons.shield_outlined),
+        FilledButton.icon(onPressed: session.signOut, icon: const Icon(Icons.logout), label: const Text('Deconnexion')),
         SectionTitle('Privacy et Data'),
         LegalTile(label: 'Privacy Policy', icon: Icons.privacy_tip_outlined, path: '/legal/privacy'),
         LegalTile(label: 'Privacy Choices', icon: Icons.tune_outlined, path: '/legal/privacy'),
