@@ -189,6 +189,7 @@ class _TravelPageState extends State<TravelPage> {
   TravelState _state = TravelState.initial;
   String? _message;
   Timer? _placeDebounce;
+  int _placeRequestGeneration = 0;
   bool _loadingPlaces = false;
   bool _directOnly = false;
   String _sort = 'recommended';
@@ -206,6 +207,7 @@ class _TravelPageState extends State<TravelPage> {
 
   void _lookupPlaces(String query) {
     _placeDebounce?.cancel();
+    final requestGeneration = ++_placeRequestGeneration;
     if (query.trim().length < 2) {
       setState(() => _suggestions = const []);
       return;
@@ -214,11 +216,11 @@ class _TravelPageState extends State<TravelPage> {
       setState(() => _loadingPlaces = true);
       try {
         final places = await _api.places(query);
-        if (mounted) setState(() => _suggestions = places);
+        if (mounted && requestGeneration == _placeRequestGeneration) setState(() => _suggestions = places);
       } on PaygateApiException catch (error) {
-        if (mounted) setState(() { _state = error.code == 'NO_CONNECTION' ? TravelState.offline : TravelState.error; _message = error.message; });
+        if (mounted && requestGeneration == _placeRequestGeneration) setState(() { _state = error.code == 'NO_CONNECTION' ? TravelState.offline : TravelState.error; _message = error.message; });
       } finally {
-        if (mounted) setState(() => _loadingPlaces = false);
+        if (mounted && requestGeneration == _placeRequestGeneration) setState(() => _loadingPlaces = false);
       }
     });
   }
