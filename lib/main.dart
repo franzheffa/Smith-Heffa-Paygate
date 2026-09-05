@@ -369,14 +369,14 @@ class CheckoutSheet extends StatefulWidget {
 }
 
 class _CheckoutSheetState extends State<CheckoutSheet> {
-  late String _rail = widget.capabilities.isEmpty ? 'Stripe' : widget.capabilities.first.rail;
+  String? _rail;
   CheckoutPreview? _checkout;
   String? _error;
   bool _loading = false;
   Future<void> _prepare() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final preview = await widget.api.prepareCheckout(offerId: widget.offer.id, preferredRail: _rail);
+      final preview = await widget.api.prepareCheckout(offerId: widget.offer.id, preferredRail: _rail!);
       if (mounted) setState(() => _checkout = preview);
     } on PaygateApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -391,9 +391,10 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               leading: Icon(rail.available ? Icons.verified_outlined : Icons.lock_outline),
               title: Text(rail.rail),
               subtitle: Text(rail.status),
-              trailing: ChoiceChip(label: const Text('Choisir'), selected: _rail == rail.rail, onSelected: (_) => setState(() => _rail = rail.rail)),
+              trailing: ChoiceChip(label: Text(rail.available ? 'Choisir' : 'Indisponible'), selected: _rail == rail.rail, onSelected: rail.available ? (_) => setState(() => _rail = rail.rail) : null),
             )),
-        SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _prepare, child: Text(_loading ? 'Revalidation...' : 'Revalider et preparer'))),
+        if (!widget.capabilities.any((rail) => rail.available)) const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Aucun rail de paiement n est confirme par le backend. Aucun checkout ne peut etre initie.', style: TextStyle(color: Color(0xff8c6100)))),
+        SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading || _rail == null ? null : _prepare, child: Text(_loading ? 'Revalidation...' : 'Revalider et preparer'))),
         if (_checkout != null) Padding(padding: const EdgeInsets.only(top: 12), child: TravelStateNotice(state: TravelState.success, message: 'CHECKOUT_CREATED · ${_checkout!.amount} ${_checkout!.currency} · execution paiement et booking desactivee.')),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: TravelStateNotice(state: TravelState.error, message: _error!)),
       ]))));
