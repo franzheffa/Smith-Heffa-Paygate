@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "releaseStatus": "BLOCKED_PENDING_FIREBASE_REAUTH",
+  "gitCommit": "3969c9a",
+  "gitBranch": "codex/flutter-mobile-api-candidate",
+  "flutterVersion": "3.35.1",
+  "dartVersion": "3.9.0",
+  "buildTimestamp": "2026-09-05T03:35:00Z",
+  "artifactSHA256": "a30e07a3ce60f9f7523e8fa4e262233148395f9849d17d7d469c3204a05386d7",
+  "firebasePreviewVersion": null,
+  "firebaseLiveVersion": "ba733ff4e46ed17c",
+  "backendDeployment": "dpl_GGMpcGzc1GoDsxYn6P5ZMTaLqxPx",
+  "pricingVersion": "SH_PRICING_2026_09_V1"
+}
