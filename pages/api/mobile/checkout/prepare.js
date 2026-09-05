@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { duffelFetch, requireDuffelConfig } from '../../../../lib/duffel';
 import { handleMobileReadCors } from '../../../../lib/mobile-api';
+import { calculateAirlinePricing } from '../../../../lib/airline-pricing';
 
 function checkoutId({ offerId, rail }) {
   return crypto.createHash('sha256').update(`mobile-readonly-v1:${offerId}:${rail}`).digest('hex').slice(0, 32);
@@ -29,6 +30,19 @@ export default async function handler(req, res) {
     return res.status(409).json({ ok: false, code: 'OFFER_EXPIRED', error: 'This offer has expired. Search again.' });
   }
 
+  let pricing;
+  try {
+    pricing = calculateAirlinePricing({
+      providerFare: offer.total_amount,
+      currency: offer.total_currency,
+      ticketCount: Array.isArray(offer.passengers) ? offer.passengers.length : 1,
+      paymentRail: preferredPaymentRail,
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'PRICING_ERROR';
+    return res.status(409).json({ ok: false, code, error: 'This offer cannot be priced safely for the selected currency.' });
+  }
+
   return res.status(200).json({
     ok: true,
     checkoutId: checkoutId({ offerId, rail: preferredPaymentRail }),
@@ -36,9 +50,16 @@ export default async function handler(req, res) {
     paymentExecution: 'DISABLED',
     bookingExecution: 'DISABLED',
     rail: preferredPaymentRail,
-    amount: offer.total_amount,
-    currency: offer.total_currency,
+    amount: pricing.total,
+    currency: pricing.currency,
     expiresAt: offer.expires_at,
+    pricing: {
+      ...pricing,
+      offerId,
+      offerExpiresAt: offer.expires_at,
+      createdAt: new Date().toISOString(),
+      expiresAt: offer.expires_at,
+    },
     clientAction: 'REVIEW_ONLY',
   });
 }
