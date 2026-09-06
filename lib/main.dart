@@ -59,6 +59,8 @@ class AuthPage extends StatelessWidget {
     const Text('Connectez-vous pour associer votre session et vos checkouts a une identite verifiee.', textAlign: TextAlign.center), const SizedBox(height: 20),
     FilledButton.icon(onPressed: session.status == AuthStatus.signingIn ? null : session.signInWithGoogle, icon: const Icon(Icons.login), label: Text(session.status == AuthStatus.signingIn ? 'Connexion...' : 'Continuer avec Google')),
     if (session.message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(session.message!, textAlign: TextAlign.center)),
+    // Firebase error codes are non-sensitive and make Preview auth failures actionable.
+    if (session.diagnosticCode != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Code de diagnostic: ${session.diagnosticCode!}', textAlign: TextAlign.center)),
   ]))))));
 }
 

@@ -44,6 +44,15 @@ void main() {
     expect(find.text('Accueil'), findsWidgets);
   });
 
+  testWidgets('auth gate exposes only the safe Firebase diagnostic code', (tester) async {
+    final signedOut = FakeAuthSession(AuthStatus.signedOut)
+      ..message = 'Ce domaine Preview n est pas autorise pour Google Sign-In.'
+      ..diagnosticCode = 'unauthorized-domain';
+    await tester.pumpWidget(PaygateApp(session: signedOut));
+
+    expect(find.text('Code de diagnostic: unauthorized-domain'), findsOneWidget);
+  });
+
   testWidgets('logout returns auth gate to signed-out state', (tester) async {
     final session = FakeAuthSession(AuthStatus.authenticated, const AppUser(displayName: 'Test', email: 'test@example.invalid'));
     await tester.pumpWidget(PaygateApp(session: session));
