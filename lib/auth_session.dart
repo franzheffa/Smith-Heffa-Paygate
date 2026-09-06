@@ -19,6 +19,7 @@ abstract class AuthSessionSource extends ChangeNotifier {
   AuthStatus get status;
   AppUser? get user;
   String? get message;
+  String? get diagnosticCode;
   Future<void> initialize();
   Future<void> signInWithGoogle();
   Future<void> signOut();
@@ -31,6 +32,8 @@ class AuthSession extends AuthSessionSource {
   AppUser? user;
   @override
   String? message;
+  @override
+  String? diagnosticCode;
   StreamSubscription<User?>? _subscription;
 
   @override
@@ -63,12 +66,32 @@ class AuthSession extends AuthSessionSource {
         if (idToken == null) throw StateError('Google did not return an ID token.');
         await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
       }
-    } catch (_) {
+    } on FirebaseAuthException catch (error) {
+      diagnosticCode = error.code;
+      if (kIsWeb && _requiresRedirectFallback(error.code)) {
+        await FirebaseAuth.instance.signInWithRedirect(GoogleAuthProvider());
+        return;
+      }
       status = AuthStatus.error;
-      message = 'Connexion Google annulee ou indisponible.';
+      message = _safeAuthMessage(error.code);
+      notifyListeners();
+    } catch (_) {
+      diagnosticCode = 'unknown';
+      status = AuthStatus.error;
+      message = 'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.';
       notifyListeners();
     }
   }
+
+  bool _requiresRedirectFallback(String code) => {'popup-blocked', 'web-storage-unsupported', 'cancelled-popup-request'}.contains(code);
+
+  String _safeAuthMessage(String code) => switch (code) {
+        'popup-closed-by-user' => 'Connexion Google annulee.',
+        'unauthorized-domain' => 'Ce domaine Preview n est pas autorise pour Google Sign-In.',
+        'operation-not-allowed' => 'Google Sign-In n est pas active pour ce projet.',
+        'network-request-failed' => 'Connexion reseau indisponible. Reessayez.',
+        _ => 'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.',
+      };
 
   @override
   Future<void> signOut() async {
@@ -77,6 +100,7 @@ class AuthSession extends AuthSessionSource {
     user = null;
     status = AuthStatus.signedOut;
     message = null;
+    diagnosticCode = null;
     notifyListeners();
   }
 

@@ -19,6 +19,8 @@ class FakeAuthSession extends AuthSessionSource {
   AppUser? user;
   @override
   String? message;
+  @override
+  String? diagnosticCode;
   int signOutCalls = 0;
   @override
   Future<void> initialize() async {}
