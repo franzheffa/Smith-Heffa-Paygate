@@ -29,7 +29,10 @@ class FakeAuthSession extends AuthSessionSource {
   int signOutCalls = 0;
   int initializeCalls = 0;
   @override
-  Future<void> initialize() async { initializeCalls++; }
+  Future<void> initialize() async {
+    initializeCalls++;
+  }
+
   @override
   Future<void> signInWithGoogle() async {}
   @override
@@ -63,9 +66,13 @@ void main() {
     expect(find.text('Accueil'), findsWidgets);
   });
 
-  testWidgets('preinitialized session is not initialized by the widget tree', (tester) async {
+  testWidgets('preinitialized session is not initialized by the widget tree', (
+    tester,
+  ) async {
     final session = FakeAuthSession(AuthStatus.signedOut);
-    await tester.pumpWidget(PaygateApp(session: session, sessionInitialized: true));
+    await tester.pumpWidget(
+      PaygateApp(session: session, sessionInitialized: true),
+    );
     expect(session.initializeCalls, 0);
   });
 
@@ -99,15 +106,9 @@ void main() {
     expect(AuthSession.safeAuthMessage('unknown'), contains('indisponible'));
   });
 
-  test('Web authDomain only uses approved Firebase Hosting hosts', () {
+  test('Web authDomain remains on the Firebase OAuth handler', () {
     expect(
-      AuthSession.resolveWebAuthDomain(
-        'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
-      ),
-      'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
-    );
-    expect(
-      AuthSession.resolveWebAuthDomain('untrusted.example'),
+      AuthSession.webAuthDomain,
       'smith-heffa-paygate-mobile.firebaseapp.com',
     );
   });
@@ -132,22 +133,24 @@ void main() {
     expect(invalid.isSingleDefaultGraph, isFalse);
   });
 
-  test('bootstrap failure blocks Firebase operations before redirect start', () async {
-    final session = AuthSession.bootstrapFailure(StateError('bootstrap failed'));
-    await session.initialize();
-    await session.signInWithGoogle();
+  test(
+    'bootstrap failure blocks Firebase operations before redirect start',
+    () async {
+      final session = AuthSession.bootstrapFailure(
+        StateError('bootstrap failed'),
+      );
+      await session.initialize();
+      await session.signInWithGoogle();
 
-    expect(session.status, AuthStatus.error);
-    expect(session.diagnosticStage, 'redirect-start');
-    expect(session.diagnosticCode, 'unknown');
-  });
+      expect(session.status, AuthStatus.error);
+      expect(session.diagnosticStage, 'redirect-start');
+      expect(session.diagnosticCode, 'unknown');
+    },
+  );
 
   test('Preview provenance marker is deterministic and non-sensitive', () {
     expect(
-      previewBuildMarker(
-        channel: 'flutter-mobile-rebuild',
-        commit: 'abc1234',
-      ),
+      previewBuildMarker(channel: 'flutter-mobile-rebuild', commit: 'abc1234'),
       'Build: abc1234',
     );
     expect(previewBuildMarker(channel: 'local', commit: 'abc1234'), isEmpty);

@@ -57,8 +57,7 @@ class AuthSession extends AuthSessionSource {
   final FirebaseAuth? _auth;
   final FirebaseRuntimeProvenance? provenance;
 
-  static String resolveWebAuthDomain(String host) =>
-      FirebaseBootstrap.resolveWebAuthDomain(host);
+  static String get webAuthDomain => FirebaseBootstrap.webAuthDomain;
 
   @override
   Future<void> initialize() async {
