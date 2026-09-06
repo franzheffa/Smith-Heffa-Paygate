@@ -42,6 +42,10 @@ dependencies:
   firebase_auth: 6.5.7
   google_sign_in: ^7.2.0
 
+dependency_overrides:
+  # Keep the Web implementation on the SDK-compatible release selected above.
+  firebase_core_web: 3.10.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
