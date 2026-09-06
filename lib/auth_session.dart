@@ -20,6 +20,8 @@ abstract class AuthSessionSource extends ChangeNotifier {
   AppUser? get user;
   String? get message;
   String? get diagnosticCode;
+  String? get diagnosticCategory;
+  String? get diagnosticStage;
   Future<void> initialize();
   Future<void> signInWithGoogle();
   Future<void> signOut();
@@ -34,11 +36,42 @@ class AuthSession extends AuthSessionSource {
   String? message;
   @override
   String? diagnosticCode;
+  @override
+  String? diagnosticCategory;
+  @override
+  String? diagnosticStage;
   StreamSubscription<User?>? _subscription;
+
+  static const _approvedWebAuthDomains = {
+    'smith-heffa-paygate-mobile.firebaseapp.com',
+    'smith-heffa-paygate-mobile.web.app',
+    'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
+  };
+
+  static String resolveWebAuthDomain(String host) =>
+      _approvedWebAuthDomains.contains(host)
+      ? host
+      : firebaseWebOptions.authDomain!;
+
+  FirebaseOptions _webOptionsForHost(String host) {
+    final authDomain = resolveWebAuthDomain(host);
+    if (authDomain == firebaseWebOptions.authDomain) return firebaseWebOptions;
+    return FirebaseOptions(
+      apiKey: firebaseWebOptions.apiKey,
+      appId: firebaseWebOptions.appId,
+      messagingSenderId: firebaseWebOptions.messagingSenderId,
+      projectId: firebaseWebOptions.projectId,
+      authDomain: authDomain,
+      storageBucket: firebaseWebOptions.storageBucket,
+      measurementId: firebaseWebOptions.measurementId,
+    );
+  }
 
   @override
   Future<void> initialize() async {
-    await Firebase.initializeApp(options: kIsWeb ? firebaseWebOptions : null);
+    await Firebase.initializeApp(
+      options: kIsWeb ? _webOptionsForHost(Uri.base.host) : null,
+    );
     _subscription = FirebaseAuth.instance.idTokenChanges().listen(
       (nextUser) {
         user = nextUser == null
@@ -52,16 +85,13 @@ class AuthSession extends AuthSessionSource {
         if (nextUser != null) {
           message = null;
           diagnosticCode = null;
+          diagnosticCategory = null;
+          diagnosticStage = null;
         }
         notifyListeners();
       },
       onError: (Object error) {
-        status = AuthStatus.error;
-        diagnosticCode = error is FirebaseAuthException
-            ? error.code
-            : 'auth-listener-error';
-        message = safeAuthMessage(diagnosticCode!);
-        notifyListeners();
+        _recordError(error, stage: 'auth-state');
       },
     );
     if (kIsWeb) await _completeWebRedirect();
@@ -72,6 +102,8 @@ class AuthSession extends AuthSessionSource {
     status = AuthStatus.signingIn;
     message = null;
     diagnosticCode = null;
+    diagnosticCategory = null;
+    diagnosticStage = null;
     notifyListeners();
     try {
       if (kIsWeb) {
@@ -89,34 +121,35 @@ class AuthSession extends AuthSessionSource {
           GoogleAuthProvider.credential(idToken: idToken),
         );
       }
-    } on FirebaseAuthException catch (error) {
-      diagnosticCode = error.code;
-      status = AuthStatus.error;
-      message = safeAuthMessage(error.code);
-      notifyListeners();
-    } catch (_) {
-      diagnosticCode = 'unknown';
-      status = AuthStatus.error;
-      message =
-          'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.';
-      notifyListeners();
+    } catch (error) {
+      _recordError(error, stage: 'redirect-start');
     }
   }
 
   Future<void> _completeWebRedirect() async {
     try {
       await FirebaseAuth.instance.getRedirectResult();
-    } on FirebaseAuthException catch (error) {
-      diagnosticCode = error.code;
-      status = AuthStatus.error;
-      message = safeAuthMessage(error.code);
-      notifyListeners();
-    } catch (_) {
-      diagnosticCode = 'redirect-result-error';
-      status = AuthStatus.error;
-      message = safeAuthMessage(diagnosticCode!);
-      notifyListeners();
+    } catch (error) {
+      _recordError(error, stage: 'redirect-result');
     }
+  }
+
+  void _recordError(Object error, {required String stage}) {
+    final code = switch (error) {
+      FirebaseAuthException() => error.code,
+      FirebaseException() => error.code,
+      _ => 'unknown',
+    };
+    diagnosticCode = code;
+    diagnosticCategory = switch (error) {
+      FirebaseAuthException() => 'FirebaseAuthException',
+      FirebaseException() => 'FirebaseException',
+      _ => 'non-firebase',
+    };
+    diagnosticStage = stage;
+    status = AuthStatus.error;
+    message = safeAuthMessage(code);
+    notifyListeners();
   }
 
   static String safeAuthMessage(String code) => switch (code) {
@@ -145,6 +178,8 @@ class AuthSession extends AuthSessionSource {
     status = AuthStatus.signedOut;
     message = null;
     diagnosticCode = null;
+    diagnosticCategory = null;
+    diagnosticStage = null;
     notifyListeners();
   }
 

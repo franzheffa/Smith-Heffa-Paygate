@@ -61,6 +61,8 @@ class AuthPage extends StatelessWidget {
     if (session.message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(session.message!, textAlign: TextAlign.center)),
     // Firebase error codes are non-sensitive and make Preview auth failures actionable.
     if (session.diagnosticCode != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Code de diagnostic: ${session.diagnosticCode!}', textAlign: TextAlign.center)),
+    if (session.diagnosticCategory != null) Text('Categorie: ${session.diagnosticCategory!}', textAlign: TextAlign.center),
+    if (session.diagnosticStage != null) Text('Etape: ${session.diagnosticStage!}', textAlign: TextAlign.center),
   ]))))));
 }
 

@@ -21,6 +21,10 @@ class FakeAuthSession extends AuthSessionSource {
   String? message;
   @override
   String? diagnosticCode;
+  @override
+  String? diagnosticCategory;
+  @override
+  String? diagnosticStage;
   int signOutCalls = 0;
   @override
   Future<void> initialize() async {}
@@ -62,13 +66,17 @@ void main() {
   ) async {
     final signedOut = FakeAuthSession(AuthStatus.signedOut)
       ..message = 'Ce domaine Preview n est pas autorise pour Google Sign-In.'
-      ..diagnosticCode = 'unauthorized-domain';
+      ..diagnosticCode = 'unauthorized-domain'
+      ..diagnosticCategory = 'FirebaseAuthException'
+      ..diagnosticStage = 'redirect-result';
     await tester.pumpWidget(PaygateApp(session: signedOut));
 
     expect(
       find.text('Code de diagnostic: unauthorized-domain'),
       findsOneWidget,
     );
+    expect(find.text('Categorie: FirebaseAuthException'), findsOneWidget);
+    expect(find.text('Etape: redirect-result'), findsOneWidget);
   });
 
   test('Firebase error mapping is deterministic and token-free', () {
@@ -81,6 +89,19 @@ void main() {
       contains('stockage'),
     );
     expect(AuthSession.safeAuthMessage('unknown'), contains('indisponible'));
+  });
+
+  test('Web authDomain only uses approved Firebase Hosting hosts', () {
+    expect(
+      AuthSession.resolveWebAuthDomain(
+        'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
+      ),
+      'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
+    );
+    expect(
+      AuthSession.resolveWebAuthDomain('untrusted.example'),
+      'smith-heffa-paygate-mobile.firebaseapp.com',
+    );
   });
 
   testWidgets('logout returns auth gate to signed-out state', (tester) async {
