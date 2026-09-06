@@ -26,8 +26,9 @@ class FakeAuthSession extends AuthSessionSource {
   @override
   String? diagnosticStage;
   int signOutCalls = 0;
+  int initializeCalls = 0;
   @override
-  Future<void> initialize() async {}
+  Future<void> initialize() async { initializeCalls++; }
   @override
   Future<void> signInWithGoogle() async {}
   @override
@@ -59,6 +60,12 @@ void main() {
     signedOut.authenticate();
     await tester.pump();
     expect(find.text('Accueil'), findsWidgets);
+  });
+
+  testWidgets('preinitialized session is not initialized by the widget tree', (tester) async {
+    final session = FakeAuthSession(AuthStatus.signedOut);
+    await tester.pumpWidget(PaygateApp(session: session, sessionInitialized: true));
+    expect(session.initializeCalls, 0);
   });
 
   testWidgets('auth gate exposes only the safe Firebase diagnostic code', (

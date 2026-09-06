@@ -41,6 +41,7 @@ class AuthSession extends AuthSessionSource {
   @override
   String? diagnosticStage;
   StreamSubscription<User?>? _subscription;
+  FirebaseAuth? _auth;
 
   static const _approvedWebAuthDomains = {
     'smith-heffa-paygate-mobile.firebaseapp.com',
@@ -69,10 +70,15 @@ class AuthSession extends AuthSessionSource {
 
   @override
   Future<void> initialize() async {
-    await Firebase.initializeApp(
-      options: kIsWeb ? _webOptionsForHost(Uri.base.host) : null,
-    );
-    _subscription = FirebaseAuth.instance.idTokenChanges().listen(
+    try {
+      final app = Firebase.apps.isEmpty
+          ? await Firebase.initializeApp(
+              options: kIsWeb ? _webOptionsForHost(Uri.base.host) : null,
+            )
+          : Firebase.app();
+      _auth = FirebaseAuth.instanceFor(app: app);
+      if (kIsWeb) await _completeWebRedirect();
+      _subscription = _auth!.idTokenChanges().listen(
       (nextUser) {
         user = nextUser == null
             ? null
@@ -94,7 +100,9 @@ class AuthSession extends AuthSessionSource {
         _recordError(error, stage: 'auth-state');
       },
     );
-    if (kIsWeb) await _completeWebRedirect();
+    } catch (error) {
+      _recordError(error, stage: 'firebase-init');
+    }
   }
 
   @override
@@ -106,9 +114,13 @@ class AuthSession extends AuthSessionSource {
     diagnosticStage = null;
     notifyListeners();
     try {
+      final auth = _auth;
+      if (auth == null) {
+        throw StateError('Firebase Auth is not initialized.');
+      }
       if (kIsWeb) {
         // Redirect is Firebase's Safari-safe flow and avoids popup blocking.
-        await FirebaseAuth.instance.signInWithRedirect(GoogleAuthProvider());
+        await auth.signInWithRedirect(GoogleAuthProvider());
         return;
       } else {
         await GoogleSignIn.instance.initialize();
@@ -117,7 +129,7 @@ class AuthSession extends AuthSessionSource {
         if (idToken == null) {
           throw StateError('Google did not return an ID token.');
         }
-        await FirebaseAuth.instance.signInWithCredential(
+        await auth.signInWithCredential(
           GoogleAuthProvider.credential(idToken: idToken),
         );
       }
@@ -128,7 +140,7 @@ class AuthSession extends AuthSessionSource {
 
   Future<void> _completeWebRedirect() async {
     try {
-      await FirebaseAuth.instance.getRedirectResult();
+      await _auth!.getRedirectResult();
     } catch (error) {
       _recordError(error, stage: 'redirect-result');
     }
@@ -172,7 +184,7 @@ class AuthSession extends AuthSessionSource {
 
   @override
   Future<void> signOut() async {
-    await FirebaseAuth.instance.signOut();
+    await _auth?.signOut();
     if (!kIsWeb) await GoogleSignIn.instance.disconnect();
     user = null;
     status = AuthStatus.signedOut;

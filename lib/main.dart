@@ -9,11 +9,17 @@ import 'paygate_api.dart';
 const _ink = Color(0xff101114);
 const _gold = Color(0xffc6a85b);
 
-void main() => runApp(const PaygateApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final session = AuthSession();
+  await session.initialize();
+  runApp(PaygateApp(session: session, sessionInitialized: true));
+}
 
 class PaygateApp extends StatefulWidget {
-  const PaygateApp({super.key, this.session});
+  const PaygateApp({super.key, this.session, this.sessionInitialized = false});
   final AuthSessionSource? session;
+  final bool sessionInitialized;
 
   @override
   State<PaygateApp> createState() => _PaygateAppState();
@@ -25,7 +31,7 @@ class _PaygateAppState extends State<PaygateApp> {
   @override
   void initState() {
     super.initState();
-    _session.initialize();
+    if (!widget.sessionInitialized) _session.initialize();
   }
 
   @override
@@ -57,7 +63,7 @@ class AuthPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
     const BrandHero(), const SizedBox(height: 28), const Text('Connexion securisee', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)), const SizedBox(height: 10),
     const Text('Connectez-vous pour associer votre session et vos checkouts a une identite verifiee.', textAlign: TextAlign.center), const SizedBox(height: 20),
-    FilledButton.icon(onPressed: session.status == AuthStatus.signingIn ? null : session.signInWithGoogle, icon: const Icon(Icons.login), label: Text(session.status == AuthStatus.signingIn ? 'Connexion...' : 'Continuer avec Google')),
+    FilledButton.icon(onPressed: session.status == AuthStatus.loading || session.status == AuthStatus.signingIn ? null : session.signInWithGoogle, icon: const Icon(Icons.login), label: Text(session.status == AuthStatus.signingIn ? 'Connexion...' : 'Continuer avec Google')),
     if (session.message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(session.message!, textAlign: TextAlign.center)),
     // Firebase error codes are non-sensitive and make Preview auth failures actionable.
     if (session.diagnosticCode != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Code de diagnostic: ${session.diagnosticCode!}', textAlign: TextAlign.center)),
