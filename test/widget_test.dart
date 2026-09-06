@@ -27,14 +27,27 @@ class FakeAuthSession extends AuthSessionSource {
   @override
   Future<void> signInWithGoogle() async {}
   @override
-  Future<void> signOut() async { signOutCalls++; status = AuthStatus.signedOut; user = null; notifyListeners(); }
-  void authenticate() { status = AuthStatus.authenticated; user = const AppUser(displayName: 'Test', email: 'test@example.invalid'); notifyListeners(); }
+  Future<void> signOut() async {
+    signOutCalls++;
+    status = AuthStatus.signedOut;
+    user = null;
+    notifyListeners();
+  }
+
+  void authenticate() {
+    status = AuthStatus.authenticated;
+    user = const AppUser(displayName: 'Test', email: 'test@example.invalid');
+    notifyListeners();
+  }
 }
 
-Widget testShell() => MobileShell(session: FakeAuthSession(AuthStatus.authenticated));
+Widget testShell() =>
+    MobileShell(session: FakeAuthSession(AuthStatus.authenticated));
 
 void main() {
-  testWidgets('auth gate renders signed-out and authenticated states', (tester) async {
+  testWidgets('auth gate renders signed-out and authenticated states', (
+    tester,
+  ) async {
     final signedOut = FakeAuthSession(AuthStatus.signedOut);
     await tester.pumpWidget(PaygateApp(session: signedOut));
     expect(find.text('Connexion securisee'), findsOneWidget);
@@ -44,17 +57,37 @@ void main() {
     expect(find.text('Accueil'), findsWidgets);
   });
 
-  testWidgets('auth gate exposes only the safe Firebase diagnostic code', (tester) async {
+  testWidgets('auth gate exposes only the safe Firebase diagnostic code', (
+    tester,
+  ) async {
     final signedOut = FakeAuthSession(AuthStatus.signedOut)
       ..message = 'Ce domaine Preview n est pas autorise pour Google Sign-In.'
       ..diagnosticCode = 'unauthorized-domain';
     await tester.pumpWidget(PaygateApp(session: signedOut));
 
-    expect(find.text('Code de diagnostic: unauthorized-domain'), findsOneWidget);
+    expect(
+      find.text('Code de diagnostic: unauthorized-domain'),
+      findsOneWidget,
+    );
+  });
+
+  test('Firebase error mapping is deterministic and token-free', () {
+    expect(
+      AuthSession.safeAuthMessage('unauthorized-domain'),
+      contains('Preview'),
+    );
+    expect(
+      AuthSession.safeAuthMessage('web-storage-unsupported'),
+      contains('stockage'),
+    );
+    expect(AuthSession.safeAuthMessage('unknown'), contains('indisponible'));
   });
 
   testWidgets('logout returns auth gate to signed-out state', (tester) async {
-    final session = FakeAuthSession(AuthStatus.authenticated, const AppUser(displayName: 'Test', email: 'test@example.invalid'));
+    final session = FakeAuthSession(
+      AuthStatus.authenticated,
+      const AppUser(displayName: 'Test', email: 'test@example.invalid'),
+    );
     await tester.pumpWidget(PaygateApp(session: session));
     await tester.tap(find.text('Compte'));
     await tester.pump();
@@ -63,7 +96,9 @@ void main() {
     expect(session.signOutCalls, 1);
     expect(find.text('Connexion securisee'), findsOneWidget);
   });
-  testWidgets('mobile shell exposes account and legal access', (WidgetTester tester) async {
+  testWidgets('mobile shell exposes account and legal access', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(MaterialApp(home: testShell()));
     expect(find.text('Enterprise Payment Rail'), findsOneWidget);
     await tester.tap(find.text('Compte'));
@@ -73,7 +108,9 @@ void main() {
     expect(find.text('Delete Account'), findsWidgets);
   });
 
-  testWidgets('footer renders at required mobile viewports', (WidgetTester tester) async {
+  testWidgets('footer renders at required mobile viewports', (
+    WidgetTester tester,
+  ) async {
     const viewports = [
       Size(320, 568),
       Size(360, 800),
@@ -98,24 +135,29 @@ void main() {
     }
   });
 
-  testWidgets('travel validates a safe local itinerary without provider access', (WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 1200));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(MaterialApp(home: testShell()));
-    await tester.tap(find.text('Voyage'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'travel validates a safe local itinerary without provider access',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(home: testShell()));
+      await tester.tap(find.text('Voyage'));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.widgetWithText(TextField, 'Depart'), 'DLA');
-    await tester.enterText(find.widgetWithText(TextField, 'Arrivee'), 'DLA');
-    await tester.tap(find.text('Rechercher les offres'));
-    await tester.pump();
+      await tester.enterText(find.widgetWithText(TextField, 'Depart'), 'DLA');
+      await tester.enterText(find.widgetWithText(TextField, 'Arrivee'), 'DLA');
+      await tester.tap(find.text('Rechercher les offres'));
+      await tester.pump();
 
-    expect(find.textContaining('ERROR:'), findsOneWidget);
-    expect(find.textContaining('Aucun ordre'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.textContaining('ERROR:'), findsOneWidget);
+      expect(find.textContaining('Aucun ordre'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('pay flow remains a local-only validation', (WidgetTester tester) async {
+  testWidgets('pay flow remains a local-only validation', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(MaterialApp(home: testShell()));
     await tester.tap(find.text('Payer'));
     await tester.pumpAndSettle();
@@ -124,11 +166,16 @@ void main() {
     await tester.tap(find.text('Valider localement'));
     await tester.pump();
 
-    expect(find.textContaining('Aucune session, charge ou debit'), findsOneWidget);
+    expect(
+      find.textContaining('Aucune session, charge ou debit'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home quick actions navigate within the mobile shell', (WidgetTester tester) async {
+  testWidgets('home quick actions navigate within the mobile shell', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(MaterialApp(home: testShell()));
     await tester.tap(find.text('Rechercher un vol'));
     await tester.pumpAndSettle();
@@ -144,13 +191,17 @@ void main() {
     );
   });
 
-  testWidgets('account legal controls remain reachable with larger text', (WidgetTester tester) async {
+  testWidgets('account legal controls remain reachable with larger text', (
+    WidgetTester tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(MediaQuery(
-      data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
-      child: MaterialApp(home: testShell()),
-    ));
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+        child: MaterialApp(home: testShell()),
+      ),
+    );
     await tester.tap(find.text('Compte'));
     await tester.pump();
     await tester.scrollUntilVisible(find.text('Delete Account'), 240);

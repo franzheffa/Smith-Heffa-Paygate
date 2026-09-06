@@ -39,59 +39,103 @@ class AuthSession extends AuthSessionSource {
   @override
   Future<void> initialize() async {
     await Firebase.initializeApp(options: kIsWeb ? firebaseWebOptions : null);
-    _subscription = FirebaseAuth.instance.idTokenChanges().listen((nextUser) {
-      user = nextUser == null ? null : AppUser(displayName: nextUser.displayName, email: nextUser.email);
-      status = nextUser == null ? AuthStatus.signedOut : AuthStatus.authenticated;
-      message = null;
-      notifyListeners();
-    }, onError: (_) {
-      status = AuthStatus.error;
-      message = 'La session Firebase ne peut pas etre restauree.';
-      notifyListeners();
-    });
+    _subscription = FirebaseAuth.instance.idTokenChanges().listen(
+      (nextUser) {
+        user = nextUser == null
+            ? null
+            : AppUser(displayName: nextUser.displayName, email: nextUser.email);
+        status = nextUser == null
+            ? AuthStatus.signedOut
+            : AuthStatus.authenticated;
+        // A signed-out event can race with a failed redirect result. Preserve that
+        // diagnostic until the user explicitly retries or signs out.
+        if (nextUser != null) {
+          message = null;
+          diagnosticCode = null;
+        }
+        notifyListeners();
+      },
+      onError: (Object error) {
+        status = AuthStatus.error;
+        diagnosticCode = error is FirebaseAuthException
+            ? error.code
+            : 'auth-listener-error';
+        message = safeAuthMessage(diagnosticCode!);
+        notifyListeners();
+      },
+    );
+    if (kIsWeb) await _completeWebRedirect();
   }
 
   @override
   Future<void> signInWithGoogle() async {
     status = AuthStatus.signingIn;
     message = null;
+    diagnosticCode = null;
     notifyListeners();
     try {
       if (kIsWeb) {
-        await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+        // Redirect is Firebase's Safari-safe flow and avoids popup blocking.
+        await FirebaseAuth.instance.signInWithRedirect(GoogleAuthProvider());
+        return;
       } else {
         await GoogleSignIn.instance.initialize();
         final account = await GoogleSignIn.instance.authenticate();
         final idToken = account.authentication.idToken;
-        if (idToken == null) throw StateError('Google did not return an ID token.');
-        await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
+        if (idToken == null) {
+          throw StateError('Google did not return an ID token.');
+        }
+        await FirebaseAuth.instance.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: idToken),
+        );
       }
     } on FirebaseAuthException catch (error) {
       diagnosticCode = error.code;
-      if (kIsWeb && _requiresRedirectFallback(error.code)) {
-        await FirebaseAuth.instance.signInWithRedirect(GoogleAuthProvider());
-        return;
-      }
       status = AuthStatus.error;
-      message = _safeAuthMessage(error.code);
+      message = safeAuthMessage(error.code);
       notifyListeners();
     } catch (_) {
       diagnosticCode = 'unknown';
       status = AuthStatus.error;
-      message = 'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.';
+      message =
+          'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.';
       notifyListeners();
     }
   }
 
-  bool _requiresRedirectFallback(String code) => {'popup-blocked', 'web-storage-unsupported', 'cancelled-popup-request'}.contains(code);
+  Future<void> _completeWebRedirect() async {
+    try {
+      await FirebaseAuth.instance.getRedirectResult();
+    } on FirebaseAuthException catch (error) {
+      diagnosticCode = error.code;
+      status = AuthStatus.error;
+      message = safeAuthMessage(error.code);
+      notifyListeners();
+    } catch (_) {
+      diagnosticCode = 'redirect-result-error';
+      status = AuthStatus.error;
+      message = safeAuthMessage(diagnosticCode!);
+      notifyListeners();
+    }
+  }
 
-  String _safeAuthMessage(String code) => switch (code) {
-        'popup-closed-by-user' => 'Connexion Google annulee.',
-        'unauthorized-domain' => 'Ce domaine Preview n est pas autorise pour Google Sign-In.',
-        'operation-not-allowed' => 'Google Sign-In n est pas active pour ce projet.',
-        'network-request-failed' => 'Connexion reseau indisponible. Reessayez.',
-        _ => 'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.',
-      };
+  static String safeAuthMessage(String code) => switch (code) {
+    'popup-closed-by-user' => 'Connexion Google annulee.',
+    'unauthorized-domain' =>
+      'Ce domaine Preview n est pas autorise pour Google Sign-In.',
+    'operation-not-allowed' =>
+      'Google Sign-In n est pas active pour ce projet.',
+    'network-request-failed' => 'Connexion reseau indisponible. Reessayez.',
+    'web-storage-unsupported' =>
+      'Le stockage du navigateur bloque la connexion Google.',
+    'invalid-api-key' => 'La configuration Firebase Web est invalide.',
+    'app-not-authorized' =>
+      'Cette application Web n est pas autorisee par Firebase.',
+    'redirect-result-error' => 'Le retour Google n a pas pu etre traite.',
+    'auth-listener-error' => 'La session Firebase ne peut pas etre restauree.',
+    _ =>
+      'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.',
+  };
 
   @override
   Future<void> signOut() async {
