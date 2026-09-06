@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:smith_heffa_paygate_mobile_rebuilt/main.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/auth_session.dart';
+import 'package:smith_heffa_paygate_mobile_rebuilt/firebase_bootstrap.dart';
 
 class FakeAuthSession extends AuthSessionSource {
   FakeAuthSession(this.status, [this.user]);
@@ -109,6 +110,47 @@ void main() {
       AuthSession.resolveWebAuthDomain('untrusted.example'),
       'smith-heffa-paygate-mobile.firebaseapp.com',
     );
+  });
+
+  test('Firebase runtime provenance rejects a split app/auth graph', () {
+    const valid = FirebaseRuntimeProvenance(
+      appCount: 1,
+      defaultAppName: '[DEFAULT]',
+      projectId: 'test-project',
+      authAppName: '[DEFAULT]',
+      authDomain: 'preview.example',
+    );
+    const invalid = FirebaseRuntimeProvenance(
+      appCount: 2,
+      defaultAppName: '[DEFAULT]',
+      projectId: 'test-project',
+      authAppName: 'secondary',
+      authDomain: 'preview.example',
+    );
+
+    expect(valid.isSingleDefaultGraph, isTrue);
+    expect(invalid.isSingleDefaultGraph, isFalse);
+  });
+
+  test('bootstrap failure blocks Firebase operations before redirect start', () async {
+    final session = AuthSession.bootstrapFailure(StateError('bootstrap failed'));
+    await session.initialize();
+    await session.signInWithGoogle();
+
+    expect(session.status, AuthStatus.error);
+    expect(session.diagnosticStage, 'redirect-start');
+    expect(session.diagnosticCode, 'unknown');
+  });
+
+  test('Preview provenance marker is deterministic and non-sensitive', () {
+    expect(
+      previewBuildMarker(
+        channel: 'flutter-mobile-rebuild',
+        commit: 'abc1234',
+      ),
+      'Build: abc1234',
+    );
+    expect(previewBuildMarker(channel: 'local', commit: 'abc1234'), isEmpty);
   });
 
   testWidgets('logout returns auth gate to signed-out state', (tester) async {

@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'firebase_options.dart';
+import 'firebase_bootstrap.dart';
 
 enum AuthStatus { loading, signedOut, signingIn, authenticated, error }
 
@@ -28,6 +27,18 @@ abstract class AuthSessionSource extends ChangeNotifier {
 }
 
 class AuthSession extends AuthSessionSource {
+  AuthSession._({FirebaseRuntime? runtime, Object? bootstrapError})
+    : _runtime = runtime,
+      _bootstrapError = bootstrapError,
+      _auth = runtime?.auth,
+      provenance = runtime?.provenance;
+
+  factory AuthSession.fromRuntime(FirebaseRuntime runtime) =>
+      AuthSession._(runtime: runtime);
+
+  factory AuthSession.bootstrapFailure(Object error) =>
+      AuthSession._(bootstrapError: error);
+
   @override
   AuthStatus status = AuthStatus.loading;
   @override
@@ -41,65 +52,54 @@ class AuthSession extends AuthSessionSource {
   @override
   String? diagnosticStage;
   StreamSubscription<User?>? _subscription;
-  FirebaseAuth? _auth;
-
-  static const _approvedWebAuthDomains = {
-    'smith-heffa-paygate-mobile.firebaseapp.com',
-    'smith-heffa-paygate-mobile.web.app',
-    'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
-  };
+  final FirebaseRuntime? _runtime;
+  final Object? _bootstrapError;
+  final FirebaseAuth? _auth;
+  final FirebaseRuntimeProvenance? provenance;
 
   static String resolveWebAuthDomain(String host) =>
-      _approvedWebAuthDomains.contains(host)
-      ? host
-      : firebaseWebOptions.authDomain!;
-
-  FirebaseOptions _webOptionsForHost(String host) {
-    final authDomain = resolveWebAuthDomain(host);
-    if (authDomain == firebaseWebOptions.authDomain) return firebaseWebOptions;
-    return FirebaseOptions(
-      apiKey: firebaseWebOptions.apiKey,
-      appId: firebaseWebOptions.appId,
-      messagingSenderId: firebaseWebOptions.messagingSenderId,
-      projectId: firebaseWebOptions.projectId,
-      authDomain: authDomain,
-      storageBucket: firebaseWebOptions.storageBucket,
-      measurementId: firebaseWebOptions.measurementId,
-    );
-  }
+      FirebaseBootstrap.resolveWebAuthDomain(host);
 
   @override
   Future<void> initialize() async {
     try {
-      final app = Firebase.apps.isEmpty
-          ? await Firebase.initializeApp(
-              options: kIsWeb ? _webOptionsForHost(Uri.base.host) : null,
-            )
-          : Firebase.app();
-      _auth = FirebaseAuth.instanceFor(app: app);
+      final bootstrapError = _bootstrapError;
+      if (bootstrapError != null) throw bootstrapError;
+      final auth = _auth;
+      final runtime = _runtime;
+      if (auth == null ||
+          runtime == null ||
+          !runtime.provenance.isSingleDefaultGraph) {
+        throw StateError(
+          'Firebase bootstrap did not provide a single default app.',
+        );
+      }
       if (kIsWeb) await _completeWebRedirect();
-      _subscription = _auth!.idTokenChanges().listen(
-      (nextUser) {
-        user = nextUser == null
-            ? null
-            : AppUser(displayName: nextUser.displayName, email: nextUser.email);
-        status = nextUser == null
-            ? AuthStatus.signedOut
-            : AuthStatus.authenticated;
-        // A signed-out event can race with a failed redirect result. Preserve that
-        // diagnostic until the user explicitly retries or signs out.
-        if (nextUser != null) {
-          message = null;
-          diagnosticCode = null;
-          diagnosticCategory = null;
-          diagnosticStage = null;
-        }
-        notifyListeners();
-      },
-      onError: (Object error) {
-        _recordError(error, stage: 'auth-state');
-      },
-    );
+      _subscription = auth.idTokenChanges().listen(
+        (nextUser) {
+          user = nextUser == null
+              ? null
+              : AppUser(
+                  displayName: nextUser.displayName,
+                  email: nextUser.email,
+                );
+          status = nextUser == null
+              ? AuthStatus.signedOut
+              : AuthStatus.authenticated;
+          // A signed-out event can race with a failed redirect result. Preserve that
+          // diagnostic until the user explicitly retries or signs out.
+          if (nextUser != null) {
+            message = null;
+            diagnosticCode = null;
+            diagnosticCategory = null;
+            diagnosticStage = null;
+          }
+          notifyListeners();
+        },
+        onError: (Object error) {
+          _recordError(error, stage: 'auth-state');
+        },
+      );
     } catch (error) {
       _recordError(error, stage: 'firebase-init');
     }
@@ -140,7 +140,9 @@ class AuthSession extends AuthSessionSource {
 
   Future<void> _completeWebRedirect() async {
     try {
-      await _auth!.getRedirectResult();
+      final auth = _auth;
+      if (auth == null) throw StateError('Firebase Auth is not initialized.');
+      await auth.getRedirectResult();
     } catch (error) {
       _recordError(error, stage: 'redirect-result');
     }

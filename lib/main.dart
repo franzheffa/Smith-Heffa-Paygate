@@ -4,21 +4,39 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'auth_session.dart';
+import 'firebase_bootstrap.dart';
 import 'paygate_api.dart';
 
 const _ink = Color(0xff101114);
 const _gold = Color(0xffc6a85b);
+const _buildCommit = String.fromEnvironment('BUILD_COMMIT', defaultValue: 'local');
+const _buildChannel = String.fromEnvironment('BUILD_CHANNEL', defaultValue: 'local');
+
+String previewBuildMarker({required String channel, required String commit}) =>
+    channel == 'flutter-mobile-rebuild' ? 'Build: $commit' : '';
+
+Future<AuthSession> _createAuthSession() async {
+  try {
+    final runtime = await FirebaseBootstrap().initialize();
+    final session = AuthSession.fromRuntime(runtime);
+    await session.initialize();
+    return session;
+  } catch (error) {
+    final session = AuthSession.bootstrapFailure(error);
+    await session.initialize();
+    return session;
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final session = AuthSession();
-  await session.initialize();
+  final session = await _createAuthSession();
   runApp(PaygateApp(session: session, sessionInitialized: true));
 }
 
 class PaygateApp extends StatefulWidget {
-  const PaygateApp({super.key, this.session, this.sessionInitialized = false});
-  final AuthSessionSource? session;
+  const PaygateApp({super.key, required this.session, this.sessionInitialized = false});
+  final AuthSessionSource session;
   final bool sessionInitialized;
 
   @override
@@ -26,7 +44,7 @@ class PaygateApp extends StatefulWidget {
 }
 
 class _PaygateAppState extends State<PaygateApp> {
-  late final AuthSessionSource _session = widget.session ?? AuthSession();
+  late final AuthSessionSource _session = widget.session;
 
   @override
   void initState() {
@@ -36,7 +54,6 @@ class _PaygateAppState extends State<PaygateApp> {
 
   @override
   void dispose() {
-    if (widget.session == null) _session.dispose();
     super.dispose();
   }
 
@@ -69,6 +86,7 @@ class AuthPage extends StatelessWidget {
     if (session.diagnosticCode != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Code de diagnostic: ${session.diagnosticCode!}', textAlign: TextAlign.center)),
     if (session.diagnosticCategory != null) Text('Categorie: ${session.diagnosticCategory!}', textAlign: TextAlign.center),
     if (session.diagnosticStage != null) Text('Etape: ${session.diagnosticStage!}', textAlign: TextAlign.center),
+    if (previewBuildMarker(channel: _buildChannel, commit: _buildCommit).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(previewBuildMarker(channel: _buildChannel, commit: _buildCommit), textAlign: TextAlign.center)),
   ]))))));
 }
 
