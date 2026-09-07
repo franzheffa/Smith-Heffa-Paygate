@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { appendPaymentAudit, upsertPaymentLedger } from '../../../../lib/paygate/ledger';
+import { beginProviderWebhookEvent, finishProviderWebhookEvent, webhookPayloadHash } from '../../../../lib/provider-webhook-events';
 
 export const config = {
   api: {
@@ -37,9 +38,15 @@ export default async function handler(req, res) {
     const payload = await readRawBody(req);
     const signature = req.headers['stripe-signature'];
     const event = stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_PIX_WEBHOOK_SECRET);
+    const intent = event.data?.object;
+    const accepted = await beginProviderWebhookEvent({
+      provider: 'STRIPE', providerEventId: event.id, providerTransactionId: intent?.id || null,
+      internalTransactionId: intent?.metadata?.checkoutId || null, eventType: event.type,
+      payloadHash: webhookPayloadHash(payload),
+    });
+    if (accepted.duplicate) return res.status(200).json({ received: true, duplicate: true });
 
     if (event.type === 'payment_intent.succeeded') {
-      const intent = event.data.object;
       try {
         await upsertPaymentLedger(req, {
           traceabilityId: intent.id,
@@ -75,7 +82,6 @@ export default async function handler(req, res) {
     }
 
     if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
-      const intent = event.data.object;
       try {
         await upsertPaymentLedger(req, {
           traceabilityId: intent.id,
@@ -109,12 +115,13 @@ export default async function handler(req, res) {
       });
     }
 
+    await finishProviderWebhookEvent(accepted.event.id);
     return res.status(200).json({ received: true });
   } catch (error) {
     return res.status(400).json({
       ok: false,
       error: 'Invalid Stripe Pix webhook',
-      message: error?.message || undefined
+      code: 'INVALID_WEBHOOK'
     });
   }
 }

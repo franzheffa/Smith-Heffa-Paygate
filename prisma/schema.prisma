@@ -122,3 +122,48 @@ model FdxAuditEvent {
   @@index([resourceType, resourceId])
   @@index([createdAt])
 }
+
+model MobileCheckout {
+  id                          String   @id
+  ownerUid                    String
+  service                     String
+  offerId                     String?
+  rail                        String
+  currency                    String
+  providerFareMinor           BigInt
+  platformTicketFeeMinor      BigInt
+  platformTransactionFeeMinor BigInt
+  providerFeeMinor            BigInt   @default(0)
+  totalMinor                  BigInt
+  pricingVersion              String
+  fxSource                    String?
+  fxRate                      String?
+  fxTimestamp                 DateTime?
+  state                       String
+  idempotencyKeyHash          String
+  providerTransactionId       String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@unique([ownerUid, idempotencyKeyHash])
+  @@index([ownerUid, createdAt])
+  @@index([providerTransactionId])
+}
+
+model ProviderWebhookEvent {
+  id                    String    @id @default(cuid())
+  provider              String
+  providerEventId       String
+  providerTransactionId String?
+  internalTransactionId String?
+  eventType             String
+  payloadHash           String
+  processingStatus      String
+  receivedAt            DateTime  @default(now())
+  processedAt           DateTime?
+
+  @@unique([provider, providerEventId])
+  @@index([providerTransactionId])
+  @@index([internalTransactionId])
+  @@index([receivedAt])
+}

@@ -3,6 +3,9 @@ import { handleMobileReadCors } from '../../../../lib/mobile-api';
 import { calculateAirlinePricing } from '../../../../lib/airline-pricing';
 import { requireFirebasePrincipal } from '../../../../lib/firebase-id-token';
 import { deterministicOperationId, requireIdempotencyKey } from '../../../../lib/payment-domain';
+import { paymentCapabilities } from '../../../../lib/payment-capabilities';
+import { publicCheckout, saveQuotedCheckout } from '../../../../lib/mobile-checkout-store';
+import { allowRequest } from '../../../../lib/rate-limit';
 
 function checkoutId({ offerId, rail, ownerUid, idempotencyKey }) {
   return deterministicOperationId({
@@ -23,6 +26,7 @@ export default async function handler(req, res) {
 
   const principal = await requireFirebasePrincipal(req, res);
   if (!principal) return;
+  if (!allowRequest(req, 'mobile-checkout-prepare', { limit: 20 })) return res.status(429).json({ ok: false, code: 'RATE_LIMITED' });
   let idempotencyKey;
   try {
     idempotencyKey = requireIdempotencyKey(req.headers['idempotency-key']);
@@ -48,23 +52,31 @@ export default async function handler(req, res) {
 
   let pricing;
   try {
+    const currency = String(offer.total_currency || '').toUpperCase();
     pricing = calculateAirlinePricing({
       providerFare: offer.total_amount,
-      currency: offer.total_currency,
+      currency,
       ticketCount: Array.isArray(offer.passengers) ? offer.passengers.length : 1,
       paymentRail: preferredPaymentRail,
+      fxRate: currency === 'USD' ? undefined : process.env[`FX_USD_TO_${currency}`],
+      fxSource: process.env.FX_RATE_SOURCE,
+      fxTimestamp: process.env.FX_RATE_TIMESTAMP,
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'PRICING_ERROR';
     return res.status(409).json({ ok: false, code, error: 'This offer cannot be priced safely for the selected currency.' });
   }
 
+  const id = checkoutId({ offerId, rail: preferredPaymentRail, ownerUid: principal.uid, idempotencyKey });
+  const stored = await saveQuotedCheckout({ id, ownerUid: principal.uid, offerId, rail: preferredPaymentRail, pricing, idempotencyKey });
+  const railCapability = paymentCapabilities({ currency: pricing.currency, platform: req.body?.platform }).rails.find((item) => item.rail === preferredPaymentRail);
+
   return res.status(200).json({
     ok: true,
-    checkoutId: checkoutId({ offerId, rail: preferredPaymentRail, ownerUid: principal.uid, idempotencyKey }),
-    status: 'CHECKOUT_CREATED',
-    paymentExecution: 'DISABLED',
-    bookingExecution: 'DISABLED',
+    checkoutId: stored.id,
+    status: stored.state,
+    paymentExecution: railCapability?.available ? 'AUTHORIZED' : 'DISABLED',
+    bookingExecution: 'AWAITING_PAYMENT_CONFIRMATION',
     rail: preferredPaymentRail,
     amount: pricing.total,
     currency: pricing.currency,
@@ -76,6 +88,8 @@ export default async function handler(req, res) {
       createdAt: new Date().toISOString(),
       expiresAt: offer.expires_at,
     },
-    clientAction: 'REVIEW_ONLY',
+    capability: railCapability || null,
+    activity: publicCheckout(stored),
+    clientAction: railCapability?.available ? 'CONFIRM_PAYMENT_METHOD' : 'PROVIDER_UNAVAILABLE',
   });
 }

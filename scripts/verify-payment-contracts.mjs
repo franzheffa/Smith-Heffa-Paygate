@@ -11,14 +11,14 @@ import {
 import { requireFirebasePrincipal, verifyIdToken } from '../lib/firebase-id-token.js';
 
 const capabilities = paymentCapabilities({ country: 'CM', currency: 'XAF', platform: 'WEB' });
-assert.equal(capabilities.environment, 'preview-safe');
+assert.equal(capabilities.environment, 'non-production');
 assert.equal(capabilities.liveExecutionEnabled, false);
 assert.deepEqual(capabilities.rails.map((item) => item.rail), PAYMENT_RAILS);
-assert.equal(capabilities.rails.length, 12);
+assert.equal(capabilities.rails.length, 14);
 assert.ok(capabilities.rails.every((item) => item.available === false));
 assert.ok(capabilities.rails.every((item) => CAPABILITY_STATUSES.includes(item.status)));
-assert.equal(capabilities.rails.find((item) => item.rail === 'Interac').status, 'REQUIRES_SETUP');
-assert.equal(paymentCapabilities({ currency: 'XAF' }).rails.find((item) => item.rail === 'Stripe').status, 'REQUIRES_SETUP');
+assert.equal(capabilities.rails.find((item) => item.rail === 'Interac').status, 'CONFIGURATION_MISSING');
+assert.equal(paymentCapabilities({ currency: 'XAF' }).rails.find((item) => item.rail === 'Stripe').status, 'CONFIGURATION_MISSING');
 
 assert.deepEqual(assertPaymentTransition('CHECKOUT_CREATED', 'PRICE_VALIDATED'), { from: 'CHECKOUT_CREATED', to: 'PRICE_VALIDATED' });
 assert.throws(() => assertPaymentTransition('CHECKOUT_CREATED', 'PAYMENT_CONFIRMED'), /ILLEGAL_PAYMENT_TRANSITION/);
