@@ -1,10 +1,17 @@
-import crypto from 'crypto';
 import { duffelFetch, requireDuffelConfig } from '../../../../lib/duffel';
 import { handleMobileReadCors } from '../../../../lib/mobile-api';
 import { calculateAirlinePricing } from '../../../../lib/airline-pricing';
+import { requireFirebasePrincipal } from '../../../../lib/firebase-id-token';
+import { deterministicOperationId, requireIdempotencyKey } from '../../../../lib/payment-domain';
 
-function checkoutId({ offerId, rail }) {
-  return crypto.createHash('sha256').update(`mobile-readonly-v1:${offerId}:${rail}`).digest('hex').slice(0, 32);
+function checkoutId({ offerId, rail, ownerUid, idempotencyKey }) {
+  return deterministicOperationId({
+    namespace: 'mobile-readonly-v2',
+    ownerUid,
+    resourceId: offerId,
+    rail,
+    idempotencyKey,
+  });
 }
 
 export default async function handler(req, res) {
@@ -12,6 +19,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+  }
+
+  const principal = await requireFirebasePrincipal(req, res);
+  if (!principal) return;
+  let idempotencyKey;
+  try {
+    idempotencyKey = requireIdempotencyKey(req.headers['idempotency-key']);
+  } catch {
+    return res.status(400).json({ ok: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'A valid idempotency key is required.' });
   }
 
   const config = requireDuffelConfig();
@@ -45,7 +61,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
-    checkoutId: checkoutId({ offerId, rail: preferredPaymentRail }),
+    checkoutId: checkoutId({ offerId, rail: preferredPaymentRail, ownerUid: principal.uid, idempotencyKey }),
     status: 'CHECKOUT_CREATED',
     paymentExecution: 'DISABLED',
     bookingExecution: 'DISABLED',

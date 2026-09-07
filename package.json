@@ -18,6 +18,7 @@
     "android:prepare": "npm run cap:sync:android",
     "mobile:prepare": "npm run cap:sync",
     "test:airline-pricing": "node --experimental-default-type=module scripts/verify-airline-pricing.mjs",
+    "test:payment-contracts": "node --experimental-default-type=module scripts/verify-payment-contracts.mjs",
     "postinstall": "prisma generate && ( [ -n \"$DATABASE_URL\" ] && prisma migrate deploy || echo \"Skipping prisma migrate deploy: DATABASE_URL not set\" )"
   },
   "dependencies": {
