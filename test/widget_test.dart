@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:smith_heffa_paygate_mobile_rebuilt/main.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/auth_session.dart';
+import 'package:smith_heffa_paygate_mobile_rebuilt/auth_trace_store.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/firebase_bootstrap.dart';
 
 class FakeAuthSession extends AuthSessionSource {
@@ -26,6 +27,8 @@ class FakeAuthSession extends AuthSessionSource {
   String? diagnosticCategory;
   @override
   String? diagnosticStage;
+  @override
+  final List<String> authTrace = [];
   int signOutCalls = 0;
   int initializeCalls = 0;
   @override
@@ -106,11 +109,75 @@ void main() {
     expect(AuthSession.safeAuthMessage('unknown'), contains('indisponible'));
   });
 
-  test('Web authDomain remains on the Firebase OAuth handler', () {
+  test('Web authDomain uses approved same-origin Hosting hosts', () {
     expect(
-      AuthSession.webAuthDomain,
+      AuthSession.resolveWebAuthDomain(
+        'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
+      ),
+      'smith-heffa-paygate-mobile--flutter-mobile-rebuild-750y53hy.web.app',
+    );
+    expect(
+      AuthSession.resolveWebAuthDomain('untrusted.example'),
       'smith-heffa-paygate-mobile.firebaseapp.com',
     );
+  });
+
+  test('redirect recovery classifies credential success', () {
+    expect(
+      classifyRedirectRecovery(
+        redirectPending: true,
+        credentialPresent: true,
+        currentUserPresent: true,
+      ),
+      RedirectRecoveryDecision.credential,
+    );
+  });
+
+  test('redirect recovery classifies restored persisted user', () {
+    expect(
+      classifyRedirectRecovery(
+        redirectPending: false,
+        credentialPresent: false,
+        currentUserPresent: true,
+      ),
+      RedirectRecoveryDecision.restoredUser,
+    );
+  });
+
+  test('redirect recovery exposes pending redirect with no Firebase user', () {
+    expect(
+      classifyRedirectRecovery(
+        redirectPending: true,
+        credentialPresent: false,
+        currentUserPresent: false,
+      ),
+      RedirectRecoveryDecision.pendingWithoutUser,
+    );
+    expect(
+      AuthSession.safeAuthMessage('redirect-result-null'),
+      contains('aucune session Firebase'),
+    );
+  });
+
+  test('redirect recovery keeps an ordinary initial visit signed out', () {
+    expect(
+      classifyRedirectRecovery(
+        redirectPending: false,
+        credentialPresent: false,
+        currentUserPresent: false,
+      ),
+      RedirectRecoveryDecision.idleSignedOut,
+    );
+  });
+
+  test('redirect pending marker has a deterministic lifecycle', () {
+    final store = AuthTraceStore();
+    store.clearRedirectPending();
+    expect(store.redirectPending, isFalse);
+    store.markRedirectPending();
+    expect(store.redirectPending, isTrue);
+    store.clearRedirectPending();
+    expect(store.redirectPending, isFalse);
   });
 
   test('Firebase runtime provenance rejects a split app/auth graph', () {

@@ -87,6 +87,11 @@ class AuthPage extends StatelessWidget {
     if (session.diagnosticCategory != null) Text('Categorie: ${session.diagnosticCategory!}', textAlign: TextAlign.center),
     if (session.diagnosticStage != null) Text('Etape: ${session.diagnosticStage!}', textAlign: TextAlign.center),
     if (previewBuildMarker(channel: _buildChannel, commit: _buildCommit).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(previewBuildMarker(channel: _buildChannel, commit: _buildCommit), textAlign: TextAlign.center)),
+    if (_buildChannel == 'flutter-mobile-rebuild' && session.authTrace.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      for (final event in session.authTrace)
+        Text('AUTH_TRACE=$event', textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+    ],
   ]))))));
 }
 
