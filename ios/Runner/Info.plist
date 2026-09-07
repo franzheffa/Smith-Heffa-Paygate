@@ -19,6 +19,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>com.googleusercontent.apps.228124388837-nqf41b4ta2h8q5s32ha1jvho4palj2te</string>
 				<string>com.smithheffa.paygate</string>
 			</array>
 		</dict>

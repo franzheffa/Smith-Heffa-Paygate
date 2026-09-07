@@ -7,11 +7,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:smith_heffa_paygate_mobile_rebuilt/main.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/auth_session.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/auth_trace_store.dart';
+import 'package:smith_heffa_paygate_mobile_rebuilt/design_system.dart';
 import 'package:smith_heffa_paygate_mobile_rebuilt/firebase_bootstrap.dart';
+import 'package:smith_heffa_paygate_mobile_rebuilt/paygate_api.dart';
 
 class FakeAuthSession extends AuthSessionSource {
   FakeAuthSession(this.status, [this.user]);
@@ -38,6 +42,8 @@ class FakeAuthSession extends AuthSessionSource {
 
   @override
   Future<void> signInWithGoogle() async {}
+  @override
+  Future<String?> getIdToken() async => 'test-id-token';
   @override
   Future<void> signOut() async {
     signOutCalls++;
@@ -223,6 +229,16 @@ void main() {
     expect(previewBuildMarker(channel: 'local', commit: 'abc1234'), isEmpty);
   });
 
+  test('design system preserves the white obsidian sun-gold contract', () {
+    expect(AppColors.canvas, const Color(0xFFFFFFFF));
+    expect(AppColors.ink, const Color(0xFF0A0A0B));
+    expect(AppColors.surface, const Color(0xFFF9F9FB));
+    expect(AppColors.gold, const Color(0xFFD4AF37));
+    expect(AppColors.radiantGold, const Color(0xFFFFD700));
+    expect(AppColors.deepGold, const Color(0xFF996515));
+    expect(AppColors.border, const Color(0xFFE5E5EA));
+  });
+
   testWidgets('logout returns auth gate to signed-out state', (tester) async {
     final session = FakeAuthSession(
       AuthStatus.authenticated,
@@ -244,7 +260,7 @@ void main() {
     await tester.tap(find.text('Compte'));
     await tester.pump();
     expect(find.text('Privacy Policy'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Delete Account'), 240);
+    await tester.scrollUntilVisible(find.text('Delete Account').first, 240);
     expect(find.text('Delete Account'), findsWidgets);
   });
 
@@ -253,11 +269,11 @@ void main() {
   ) async {
     const viewports = [
       Size(320, 568),
-      Size(360, 800),
-      Size(375, 812),
+      Size(360, 640),
+      Size(375, 667),
       Size(390, 844),
       Size(393, 852),
-      Size(412, 915),
+      Size(414, 896),
       Size(430, 932),
     ];
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -303,7 +319,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '1250');
-    await tester.tap(find.text('Valider localement'));
+    await tester.tap(find.text('Vérifier la demande'));
     await tester.pump();
 
     expect(
@@ -317,7 +333,10 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(MaterialApp(home: testShell()));
-    await tester.tap(find.text('Rechercher un vol'));
+    final flightAction = find.text('Rechercher un vol').first;
+    await tester.ensureVisible(flightAction);
+    await tester.pump();
+    await tester.tap(flightAction);
     await tester.pumpAndSettle();
 
     expect(find.text('Rechercher un vol'), findsOneWidget);
@@ -331,6 +350,49 @@ void main() {
     );
   });
 
+  test(
+    'protected checkout sends Firebase Bearer and idempotency headers',
+    () async {
+      late http.Request captured;
+      final api = PaygateApi(
+        baseUri: Uri.parse('https://api.example.invalid'),
+        tokenProvider: () async => 'opaque-test-token',
+        client: MockClient((request) async {
+          captured = request;
+          return http.Response(
+            '{"checkoutId":"c1","amount":"117.43","currency":"USD","rail":"Stripe"}',
+            200,
+          );
+        }),
+      );
+
+      await api.prepareCheckout(offerId: 'offer-1', preferredRail: 'Stripe');
+
+      expect(captured.headers['Authorization'], 'Bearer opaque-test-token');
+      expect(captured.headers['Idempotency-Key'], startsWith('flutter:'));
+      expect(captured.body, contains('offer-1'));
+    },
+  );
+
+  test('protected checkout refuses a missing Firebase token', () async {
+    final api = PaygateApi(
+      baseUri: Uri.parse('https://api.example.invalid'),
+      tokenProvider: () async => null,
+      client: MockClient((_) async => http.Response('{}', 500)),
+    );
+
+    await expectLater(
+      () => api.prepareCheckout(offerId: 'offer-1', preferredRail: 'Stripe'),
+      throwsA(
+        isA<PaygateApiException>().having(
+          (error) => error.code,
+          'code',
+          'AUTH_REQUIRED',
+        ),
+      ),
+    );
+  });
+
   testWidgets('account legal controls remain reachable with larger text', (
     WidgetTester tester,
   ) async {
@@ -338,13 +400,13 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MediaQuery(
-        data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
         child: MaterialApp(home: testShell()),
       ),
     );
     await tester.tap(find.text('Compte'));
     await tester.pump();
-    await tester.scrollUntilVisible(find.text('Delete Account'), 240);
+    await tester.scrollUntilVisible(find.text('Delete Account').first, 240);
 
     expect(find.text('Delete Account'), findsWidgets);
     expect(tester.takeException(), isNull);

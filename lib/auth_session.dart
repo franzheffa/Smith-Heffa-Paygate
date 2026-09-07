@@ -43,6 +43,7 @@ abstract class AuthSessionSource extends ChangeNotifier {
   List<String> get authTrace;
   Future<void> initialize();
   Future<void> signInWithGoogle();
+  Future<String?> getIdToken();
   Future<void> signOut();
 }
 
@@ -340,6 +341,12 @@ class AuthSession extends AuthSessionSource {
     _ =>
       'Connexion Google indisponible. Reessayez ou utilisez un autre navigateur.',
   };
+
+  @override
+  Future<String?> getIdToken() async {
+    final currentUser = _auth?.currentUser;
+    return currentUser?.getIdToken();
+  }
 
   @override
   Future<void> signOut() async {
