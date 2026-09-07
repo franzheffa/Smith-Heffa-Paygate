@@ -157,16 +157,6 @@ class AuthPage extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                if (_buildChannel == 'flutter-mobile-rebuild' &&
-                    session.authTrace.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  for (final event in session.authTrace)
-                    Text(
-                      'AUTH_TRACE=$event',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                ],
               ],
             ),
           ),

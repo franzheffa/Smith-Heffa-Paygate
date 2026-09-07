@@ -92,7 +92,8 @@ void main() {
       ..message = 'Ce domaine Preview n est pas autorise pour Google Sign-In.'
       ..diagnosticCode = 'unauthorized-domain'
       ..diagnosticCategory = 'FirebaseAuthException'
-      ..diagnosticStage = 'redirect-result';
+      ..diagnosticStage = 'redirect-result'
+      ..authTrace.add('AUTH_TRACE=internal-only');
     await tester.pumpWidget(PaygateApp(session: signedOut));
 
     expect(
@@ -101,6 +102,7 @@ void main() {
     );
     expect(find.text('Categorie: FirebaseAuthException'), findsOneWidget);
     expect(find.text('Etape: redirect-result'), findsOneWidget);
+    expect(find.textContaining('AUTH_TRACE='), findsNothing);
   });
 
   test('Firebase error mapping is deterministic and token-free', () {
